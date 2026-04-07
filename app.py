@@ -100,10 +100,23 @@ with tabs[2]:
 with tabs[3]:
     st.header(T[3])
     
+    # Calculate Totals
     total_revenue = sum([s['total'] for s in st.session_state.db['sales']])
     total_expenses = sum([p['total'] for p in st.session_state.db['purchase_receipts']])
     net_profit = total_revenue - total_expenses
     
+    # Display Metrics
     c1, c2, c3 = st.columns(3)
-    c1.metric("Total Sales (Revenue)", f"₱{total_revenue:,.2f}")
-    c2.metric("Total Expenses", f"₱{total_expenses:,.2f}",
+    
+    # Using simple strings to avoid f-string formatting errors
+    sales_text = "₱{:,.2f}".format(total_revenue)
+    exp_text = "₱{:,.2f}".format(total_expenses)
+    profit_text = "₱{:,.2f}".format(net_profit)
+    
+    c1.metric("Total Sales", sales_text)
+    c2.metric("Total Expenses", exp_text, delta_color="inverse")
+    
+    if net_profit >= 0:
+        c3.metric("Net Profit", profit_text, delta=profit_text)
+    else:
+        c3.metric("Net Loss", profit_text, delta=profit_text, delta_color="normal")
