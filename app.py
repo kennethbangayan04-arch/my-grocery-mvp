@@ -174,18 +174,61 @@ with tabs[1]:
                 st.rerun()
     else:
         st.info("Inventory is empty.")
-# --- TAB 3: EXPENSES ---
+# --- TAB 3: EXPENSES (With Monthly Filter) ---
 with tabs[2]:
     st.subheader(D["rec_h"])
+    
+    # 1. Input Form
     with st.form("p_form", clear_on_submit=True):
         s_n = st.text_input(D["store"])
         a_p = st.number_input(D["amt"], min_value=0.0)
         u_p = st.file_uploader(D["photo"], type=['jpg', 'png', 'jpeg'])
+        
         if st.form_submit_button(D["btn_save"]):
             if s_n and a_p > 0:
-                st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().date()), "store": s_n.upper(), "total": a_p})
-                save_data(); st.success("Saved!"); st.rerun()
+                # We save the date as a string for the JSON file
+                st.session_state.db['purchase_receipts'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
+                    "store": s_n.upper(), 
+                    "total": a_p
+                })
+                save_data()
+                st.success("Saved!" if lang == "English" else "Naitabi na!")
+                st.rerun()
 
+    # 2. Monthly Filter & History
+    if st.session_state.db['purchase_receipts']:
+        st.write("---")
+        p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        
+        # Convert date column to datetime objects
+        p_df['date'] = pd.to_datetime(p_df['date'])
+        # Create a display column for the month (e.g., "April 2026")
+        p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
+        
+        # MONTH SELECTOR DROPDOWN
+        available_exp_months = p_df['month_year'].unique()
+        sel_exp_month = st.selectbox(
+            "Tingnan ang Gasto sa Buwan ng:" if lang == "Tagalog" else "View Expenses For:", 
+            options=available_exp_months,
+            key="exp_month_sel"
+        )
+        
+        # Filter the data
+        filtered_exp = p_df[p_df['month_year'] == sel_exp_month]
+        
+        # Display Summary for the month
+        monthly_total = filtered_exp['total'].sum()
+        st.metric(f"{sel_exp_month} {D['exp']}", f"₱{monthly_total:,.2f}")
+        
+        # Display Table
+        # Cleaning up the view: removing the helper column before showing the user
+        display_df = filtered_exp[['date', 'store', 'total']].copy()
+        display_df.columns = ["DATE", "STORE", "AMOUNT"]
+        st.dataframe(display_df, use_container_width=True)
+        
+    else:
+        st.info("Walang nakatalang gasto." if lang == "Tagalog" else "No recorded expenses.")
 # --- TAB 4: REPORTS (Clean 0.00 Start) ---
 with tabs[3]:
     st.subheader(D["rep_h"])
