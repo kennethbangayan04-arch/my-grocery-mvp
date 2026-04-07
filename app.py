@@ -134,21 +134,58 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# TAB 2: INVENTORY
+# --- TAB 2: INVENTORY (With Delete/Management) ---
 with tabs[1]:
     st.subheader(D["inv_header"])
-    for k, v in st.session_state.db['inventory'].items():
-        if v['stock'] <= v['min_alert']: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
+    # 1. Low Stock Alerts
+    for k, v in st.session_state.db['inventory'].items():
+        if v['stock'] <= v['min_alert']: 
+            st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+    
+    # 2. Registration Form
     with st.expander(D["btn_reg"]):
-        with st.form("add_form"):
-            c_i = st.text_input("Code"); n_i = st.text_input(D["name"])
-            s_i = st.number_input(D["stock"], min_value=0); p_i = st.number_input(D["price"], min_value=0.0)
+        with st.form("add_form", clear_on_submit=True):
+            c_i = st.text_input("Code")
+            n_i = st.text_input(D["name"])
+            s_i = st.number_input(D["stock"], min_value=0)
+            p_i = st.number_input(D["price"], min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
-                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
-                save_data(); st.rerun()
-    st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'))
+                if c_i and n_i:
+                    st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
+                    save_data()
+                    st.rerun()
 
+    # 3. Current Inventory Display
+    if st.session_state.db['inventory']:
+        st.write("---")
+        # Capitalized display for professional look
+        inv_df = pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index').reset_index()
+        inv_df.columns = ["CODE", "NAME", "STOCK", "PRICE", "ALERT_LEVEL"]
+        st.table(inv_df)
+
+        # 4. DELETE / MANAGEMENT SECTION
+        st.markdown("### 🛠️ " + ("Manage Inventory" if lang == "English" else "Pamamahala ng Produkto"))
+        
+        # Create a dropdown to select which item to delete
+        # We use a selectbox because a button next to every row in a big inventory makes the screen messy
+        items_list = {v['name']: k for k, v in st.session_state.db['inventory'].items()}
+        to_delete_name = st.selectbox(
+            "Select Product to Remove" if lang == "English" else "Piliin ang Produktong Buburahin", 
+            options=list(items_list.keys())
+        )
+        
+        delete_btn_label = "🗑️ Delete Product" if lang == "English" else "🗑️ Burahin ang Produkto"
+        if st.button(delete_label if 'delete_label' in locals() else delete_btn_label, type="secondary"):
+            # Get the code from the name
+            code_to_remove = items_list[to_delete_name]
+            # Remove from database
+            del st.session_state.db['inventory'][code_to_remove]
+            save_data()
+            st.success(f"Removed {to_delete_name}!")
+            st.rerun()
+    else:
+        st.info("No products registered yet.")
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
     st.subheader(D["receipt_header"])
