@@ -5,217 +5,91 @@ import json
 import os
 import urllib.parse
 
-# --- 1. DATA ENGINE ---
+# --- 1. DATA ENGINE (The "Reactor" Logic) ---
 DB_FILE = 'negosyo_pro_master.json'
+
 def load_data():
+    # Default data if the file is missing
+    default_data = {
+        'sales': [], 
+        'inventory': {
+            "4800016644801": {"NAME": "LUCKY ME", "STOCK": 20, "ALERT": 5, "BOUGHT": 12.0, "SRP": 15.0},
+            "12345": {"NAME": "RICE (1KG)", "STOCK": 50, "ALERT": 10, "BOUGHT": 45.0, "SRP": 55.0}
+        }, 
+        'purchase_receipts': [], 
+        'debts': []
+    }
+    
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: return json.load(f)
-        except: pass
-    return {'sales': [], 'inventory': {"4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 5, "price": 15}, "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 10, "price": 55}}, 'purchase_receipts': [], 'debts': []}
+            with open(DB_FILE, 'r') as f: 
+                data = json.load(f)
+                # MIGRATION: Auto-fix old data to include BOUGHT and SRP
+                for k, v in data['inventory'].items():
+                    if "BOUGHT" not in v: v["BOUGHT"] = v.get("cost", v.get("price", 0))
+                    if "SRP" not in v: v["SRP"] = v.get("price", 0)
+                    if "NAME" not in v: v["NAME"] = v.get("name", "Unknown").upper()
+                    if "STOCK" not in v: v["STOCK"] = v.get("stock", 0)
+                return data
+        except:
+            return default_data
+    return default_data
 
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
 def save_data():
-    with open(DB_FILE, 'w') as f: json.dump(st.session_state.db, f)
+    with open(DB_FILE, 'w') as f:
+        json.dump(st.session_state.db, f)
 
-# --- 2. THE DICTIONARY (Every Word is Here) ---
-st.set_page_config(page_title="Negosyo Pro MVP", layout="wide")
+# --- 2. MULTI-LANGUAGE DICTIONARY ---
+st.set_page_config(page_title="Negosyo Pro MVP", layout="wide", page_icon="🏪")
 lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
 D = {
     "English": {
-        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Purchase Receipts", "📊 Reports", "💳 Utang Tracker"],
-        "sale_header": "Register a Sale",
-        "input_code": "Scan/Type Barcode",
-        "btn_sell": "Complete Sale",
-        "inv_header": "Stock Management",
-        "btn_reg": "Register New Product",
-        "name": "Product Name", "stock": "Current Stock", "price": "Price",
-        "receipt_header": "Log Grocery Receipts",
-        "store": "Store Name", "amt": "Amount Spent", "photo": "Upload Photo",
-        "btn_save": "Save to Archive",
-        "rep_header": "Financial Summary",
-        "rev": "Total Sales", "exp": "Total Expenses", "prof": "Net Profit",
-        "utang_header": "Debt Management",
-        "cust": "Customer Name", "phone": "Mobile Number", "debt_amt": "Debt Amount",
-        "btn_sms": "Send SMS Reminder",
-        "low_stock": "⚠️ LOW STOCK!"
+        "tabs": ["⚡ QUICK SALE", "📦 INVENTORY", "🧾 EXPENSES", "📊 REPORTS", "💳 UTANG"],
+        "cost_label": "BOUGHT PRICE (COST)", "srp_label": "SELLING PRICE (SRP)",
+        "btn_reg": "REGISTER PRODUCT", "btn_sell": "COMPLETE SALE", "markup": "MARKUP (PROFIT/UNIT)"
     },
     "Tagalog": {
-        "tabs": ["⚡ Mabilisang Benta", "📦 Imbentaryo", "🧾 Resibo ng Binili", "📊 Mga Ulat", "💳 Listahan ng Utang"],
-        "sale_header": "Itala ang Benta",
-        "input_code": "I-scan/I-type ang Barcode",
-        "btn_sell": "Tapusin ang Benta",
-        "inv_header": "Pamamahala ng Stock",
-        "btn_reg": "I-rehistro ang Produkto",
-        "name": "Pangalan ng Produkto", "stock": "Bilang ng Stock", "price": "Presyo",
-        "receipt_header": "Itala ang mga Resibo",
-        "store": "Pangalan ng Tindahan", "amt": "Halagang Nagastos", "photo": "I-upload ang Larawan",
-        "btn_save": "I-save sa Archive",
-        "rep_header": "Ulat ng Kita at Gasto",
-        "rev": "Kabuuang Benta", "exp": "Kabuuang Gasto", "prof": "Netong Kita",
-        "utang_header": "Listahan ng mga Utang",
-        "cust": "Pangalan ng Customer", "phone": "Numero ng Telepono", "debt_amt": "Halaga ng Utang",
-        "btn_sms": "Magpadala ng SMS",
-        "low_stock": "⚠️ MABABA ANG STOCK!"
+        "tabs": ["⚡ BENTA", "📦 IMBENTARYO", "🧾 GASTO", "📊 ULAT", "💳 UTANG"],
+        "cost_label": "PRESYONG BILI (PUHUNAN)", "srp_label": "PRESYONG TINDA (SRP)",
+        "btn_reg": "I-REHISTRO ANG PRODUKTO", "btn_sell": "TAPUSIN ANG BENTA", "markup": "TUBO BAWAT ISA"
     }
 }[lang]
 
-# --- 3. UI LAYOUT ---
-st.title(f"🏪 Negosyo Pro")
+st.title("🏪 Negosyo Pro")
 tabs = st.tabs(D["tabs"])
 
-# --- TAB 1: QUICK SALE (With Multi-Item Cart) ---
+# --- TAB 1: QUICK SALE (The Checkout) ---
 with tabs[0]:
-    st.subheader(D["sale_header"])
+    st.subheader(D["tabs"][0])
+    if 'cart' not in st.session_state: st.session_state.cart = []
     
-    # Initialize an empty cart in the session if it doesn't exist
-    if 'cart' not in st.session_state:
-        st.session_state.cart = []
-
-    col_input, col_qty = st.columns([3, 1])
-    b_in = col_input.text_input(D["input_code"], key="sale_in")
-    q_in = col_qty.number_input("Qty", min_value=1, value=1)
+    c_in, q_in = st.columns([3, 1])
+    barcode = c_in.text_input("SCAN / TYPE BARCODE", key="sale_scan")
+    qty = q_in.number_input("QTY", min_value=1, value=1)
     
-    if b_in in st.session_state.db['inventory']:
-        item = st.session_state.db['inventory'][b_in]
-        st.info(f"✨ **{item['name']}** | ₱{item['price']} | Stock: {item['stock']}")
-        
-        if st.button("➕ Add to Cart" if lang == "English" else "➕ Idagdag sa Cart"):
-            if item['stock'] >= q_in:
-                # Add to temporary cart
+    if barcode in st.session_state.db['inventory']:
+        item = st.session_state.db['inventory'][barcode]
+        st.info(f"✨ **{item['NAME']}** | SRP: ₱{item['SRP']:.2f} | STOCK: {item['STOCK']}")
+        if st.button("➕ ADD TO CART"):
+            if item['STOCK'] >= qty:
                 st.session_state.cart.append({
-                    "code": b_in,
-                    "name": item['name'],
-                    "qty": q_in,
-                    "price": item['price'],
-                    "subtotal": item['price'] * q_in
+                    "CODE": barcode, "ITEM": item['NAME'], "QTY": qty, 
+                    "BOUGHT": item['BOUGHT'], "SRP": item['SRP'], "SUBTOTAL": item['SRP'] * qty
                 })
-                st.success(f"Added {q_in}x {item['name']}")
-            else:
-                st.error("Insufficient Stock!")
+                st.rerun()
+            else: st.error("No Stock!")
 
-    # --- DISPLAY CART ---
     if st.session_state.cart:
         st.write("---")
-        st.markdown("### 🛒 Current Cart / Mga Bibilhin")
-        cart_df = pd.DataFrame(st.session_state.cart)
-        # Capitalize headers for the cart as well
-        cart_df.columns = ["CODE", "ITEM", "QTY", "PRICE", "SUBTOTAL"]
-        st.table(cart_df)
+        df_cart = pd.DataFrame(st.session_state.cart)
+        st.table(df_cart[["ITEM", "QTY", "SRP", "SUBTOTAL"]])
+        total = df_cart["SUBTOTAL"].sum()
+        st.header(f"TOTAL: ₱{total:,.2f}")
         
-        total_bill = cart_df['SUBTOTAL'].sum()
-        st.header(f"TOTAL: ₱{total_bill:,.2f}")
-        
-        c_pay, c_clear = st.columns(2)
-        
-        # FINAL CHECKOUT BUTTON
-        if c_pay.button("🏁 " + D["btn_sell"], type="primary", use_container_width=True):
+        if st.button("🏁 " + D["btn_sell"], type="primary"):
             for entry in st.session_state.cart:
-                # 1. Deduct from inventory
-                st.session_state.db['inventory'][entry['code']]['stock'] -= entry['qty']
-                # 2. Record in Sales History
-                st.session_state.db['sales'].append({
-                    "date": str(datetime.now().strftime("%Y-%m-%d %H:%M")),
-                    "item": entry['name'],
-                    "total": entry['subtotal']
-                })
-            
-            # Save data and clear cart
-            save_data()
-            st.session_state.cart = []
-            st.balloons()
-            st.success("Transaction Complete!")
-            st.rerun()
-
-        if c_clear.button("🗑️ Clear Cart", use_container_width=True):
-            st.session_state.cart = []
-            st.rerun()
-
-# TAB 2: INVENTORY
-with tabs[1]:
-    st.subheader(D["inv_header"])
-    for k, v in st.session_state.db['inventory'].items():
-        if v['stock'] <= v['min_alert']: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
-    
-    with st.expander(D["btn_reg"]):
-        with st.form("add_form"):
-            c_i = st.text_input("Code"); n_i = st.text_input(D["name"])
-            s_i = st.number_input(D["stock"], min_value=0); p_i = st.number_input(D["price"], min_value=0.0)
-            if st.form_submit_button(D["btn_reg"]):
-                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
-                save_data(); st.rerun()
-    st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'))
-
-# TAB 3: RECEIPTS (Expense)
-with tabs[2]:
-    st.subheader(D["receipt_header"])
-    with st.form("p_form"):
-        s_n = st.text_input(D["store"]); a_p = st.number_input(D["amt"])
-        u_p = st.file_uploader(D["photo"], type=['jpg','png'])
-        if st.form_submit_button(D["btn_save"]):
-            st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().date()), "store": s_n, "total": a_p})
-            save_data(); st.success("Saved!"); st.rerun()
-    st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']))
-
-# TAB 4: REPORTS
-with tabs[3]:
-    st.subheader(D["rep_header"])
-    rev = sum([s['total'] for s in st.session_state.db['sales']])
-    exp = sum([p['total'] for p in st.session_state.db['purchase_receipts']])
-    c1, c2, c3 = st.columns(3)
-    c1.metric(D["rev"], f"₱{rev:,.2f}")
-    c2.metric(D["exp"], f"₱{exp:,.2f}")
-    c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
-
-# TAB 5: UTANG (With Delete/Paid Function)
-with tabs[4]:
-    st.subheader(D["utang_header"])
-    
-    # 1. Entry Form
-    with st.form("utang_form", clear_on_submit=True):
-        u_n = st.text_input(D["cust"])
-        u_p = st.text_input(D["phone"])
-        u_a = st.number_input(D["debt_amt"], min_value=0.0)
-        if st.form_submit_button(f"➕ {D['utang_header']}"):
-            if u_n and u_p:
-                st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
-                save_data()
-                st.rerun()
-
-    # 2. List and Actions
-    if st.session_state.db['debts']:
-        st.markdown("---")
-        
-        # Display as a nice table first
-        d_df = pd.DataFrame(st.session_state.db['debts'])
-        st.table(d_df)
-        
-        # --- DELETE / PAID SECTION ---
-        st.write("---")
-        col_remind, col_delete = st.columns(2)
-        
-        with col_remind:
-            st.subheader(D["btn_sms"])
-            sel_idx = st.selectbox("Select Customer", range(len(st.session_state.db['debts'])), 
-                                   format_func=lambda x: st.session_state.db['debts'][x]['name'])
-            
-            pers = st.session_state.db['debts'][sel_idx]
-            
-            # Bilingual Message
-            msg = f"Paalala mula sa tindahan: May utang po na ₱{pers['amount']:,.2f}. Salamat!" if lang == "Tagalog" else f"Reminder from the store: Balance of ₱{pers['amount']:,.2f}. Thank you!"
-            
-            st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
-
-        with col_delete:
-            st.subheader("Action")
-            # The "Delete" button
-            delete_label = "✅ Mark as Paid / Delete" if lang == "English" else "✅ Bayad na / Burahin"
-            if st.button(delete_label, type="primary"):
-                # Remove the selected person using their index
-                removed_person = st.session_state.db['debts'].pop(sel_idx)
-                save_data()
-                st.success(f"Removed {removed_person['name']} from list.")
-                st.rerun()
+                st.session_state.db['inventory'][entry['CODE']]['STOCK']
