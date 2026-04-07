@@ -134,7 +134,7 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# --- TAB 2: INVENTORY (With Delete/Management) ---
+# --- TAB 2: INVENTORY (With Restock & Delete) ---
 with tabs[1]:
     st.subheader(D["inv_header"])
     
@@ -143,49 +143,55 @@ with tabs[1]:
         if v['stock'] <= v['min_alert']: 
             st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
-    # 2. Registration Form
+    # 2. Registration Form (For NEW products)
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
-            c_i = st.text_input("Code")
-            n_i = st.text_input(D["name"])
-            s_i = st.number_input(D["stock"], min_value=0)
-            p_i = st.number_input(D["price"], min_value=0.0)
+            c_i = st.text_input("Barcode/Code")
+            n_i = st.text_input(D["name"]).upper()
+            col_s, col_p = st.columns(2)
+            s_i = col_s.number_input("Initial Stock", min_value=0)
+            p_i = col_p.number_input("Price (SRP)", min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
                 if c_i and n_i:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
-                    save_data()
-                    st.rerun()
+                    save_data(); st.rerun()
 
-    # 3. Current Inventory Display
+    # 3. Dynamic Inventory List
     if st.session_state.db['inventory']:
         st.write("---")
-        # Capitalized display for professional look
-        inv_df = pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index').reset_index()
-        inv_df.columns = ["CODE", "NAME", "STOCK", "PRICE", "ALERT_LEVEL"]
-        st.table(inv_df)
+        # Columns: Code, Name, Stock, Price, Restock, Delete
+        h1, h2, h3, h4, h5, h6 = st.columns([2, 3, 1, 1, 1.5, 1])
+        h1.write("**CODE**")
+        h2.write("**NAME**")
+        h3.write("**STOCK**")
+        h4.write("**PRICE**")
+        h5.write("**RESTOCK**") # New Column
+        h6.write("**ACTION**")
+        st.divider()
 
-        # 4. DELETE / MANAGEMENT SECTION
-        st.markdown("### 🛠️ " + ("Manage Inventory" if lang == "English" else "Pamamahala ng Produkto"))
-        
-        # Create a dropdown to select which item to delete
-        # We use a selectbox because a button next to every row in a big inventory makes the screen messy
-        items_list = {v['name']: k for k, v in st.session_state.db['inventory'].items()}
-        to_delete_name = st.selectbox(
-            "Select Product to Remove" if lang == "English" else "Piliin ang Produktong Buburahin", 
-            options=list(items_list.keys())
-        )
-        
-        delete_btn_label = "🗑️ Delete Product" if lang == "English" else "🗑️ Burahin ang Produkto"
-        if st.button(delete_label if 'delete_label' in locals() else delete_btn_label, type="secondary"):
-            # Get the code from the name
-            code_to_remove = items_list[to_delete_name]
-            # Remove from database
-            del st.session_state.db['inventory'][code_to_remove]
-            save_data()
-            st.success(f"Removed {to_delete_name}!")
-            st.rerun()
+        for code, details in list(st.session_state.db['inventory'].items()):
+            r1, r2, r3, r4, r5, r6 = st.columns([2, 3, 1, 1, 1.5, 1])
+            
+            r1.write(f"`{code}`")
+            r2.write(details['name'])
+            r3.write(f"**{details['stock']}**")
+            r4.write(f"₱{details['price']:.2f}")
+            
+            # --- RESTOCK FEATURE ---
+            # Allows adding 10 units with one click
+            if r5.button("➕ Add 10", key=f"add_{code}"):
+                st.session_state.db['inventory'][code]['stock'] += 10
+                save_data()
+                st.toast(f"Added 10 units to {details['name']}!")
+                st.rerun()
+            
+            # --- DELETE FEATURE ---
+            if r6.button("🗑️", key=f"del_{code}"):
+                del st.session_state.db['inventory'][code]
+                save_data()
+                st.rerun()
     else:
-        st.info("No products registered yet.")
+        st.info("Inventory is empty.")
         
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
