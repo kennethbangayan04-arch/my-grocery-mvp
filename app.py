@@ -160,18 +160,67 @@ with tabs[2]:
             save_data(); st.rerun()
     st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']), use_container_width=True)
 
-# --- TAB 4: REPORTS ---
+# --- TAB 4: REPORTS (Monthly Analysis) ---
 with tabs[3]:
     st.subheader(D["rep_h"])
-    s_df = pd.DataFrame(st.session_state.db['sales'])
-    p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
-    rev = s_df['total'].sum() if not s_df.empty else 0
-    exp = p_df['total'].sum() if not p_df.empty else 0
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric(D["rev"], f"₱{rev:,.2f}")
-    c2.metric(D["exp"], f"₱{exp:,.2f}")
-    c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
+    if st.session_state.db['sales']:
+        s_df = pd.DataFrame(st.session_state.db['sales'])
+        
+        # 1. Convert 'date' string to actual datetime objects for filtering
+        s_df['date'] = pd.to_datetime(s_df['date'])
+        
+        # 2. MONTH SELECTOR UI
+        # We extract unique months/years from your sales history
+        s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
+        available_months = s_df['month_year'].unique()
+        
+        selected_month = st.selectbox(
+            "Piliin ang Buwan" if lang == "Tagalog" else "Select Month", 
+            options=available_months
+        )
+        
+        # 3. FILTER DATA based on selection
+        monthly_data = s_df[s_df['month_year'] == selected_month]
+        
+        # 4. CALCULATE METRICS
+        # Revenue from filtered sales
+        rev = monthly_data['total'].sum()
+        
+        # Expenses (We filter expenses too if they have dates)
+        p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        if not p_df.empty:
+            p_df['date'] = pd.to_datetime(p_df['date'])
+            p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
+            monthly_exp = p_df[p_df['month_year'] == selected_month]['total'].sum()
+        else:
+            monthly_exp = 0
+
+        # Profit Calculation
+        # Safety Check: Use actual profit if columns exist, otherwise estimate 20%
+        if 'srp' in monthly_data.columns and 'bought' in monthly_data.columns:
+            prof = (monthly_data['srp'] - monthly_data['bought']).sum()
+        else:
+            prof = rev * 0.20 
+
+        # 5. DISPLAY METRICS
+        st.info(f"📅 {selected_month}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(D["rev"], f"₱{rev:,.2f}")
+        c2.metric(D["exp"], f"₱{monthly_exp:,.2f}")
+        c3.metric(D["prof"], f"₱{prof:,.2f}")
+        
+        # 6. VISUAL CHART (For Extra Credit!)
+        st.write("---")
+        st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
+        daily_sales = monthly_data.groupby(monthly_data['date'].dt.date)['total'].sum()
+        st.line_chart(daily_sales)
+        
+        with st.expander("View Monthly Log" if lang == "English" else "Tingnan ang Listahan"):
+            st.dataframe(monthly_data[[ 'date', 'item', 'total' ]], use_container_width=True)
+            
+    else:
+        st.info("Walang benta." if lang == "Tagalog" else "No sales yet.")
 
 # --- TAB 5: UTANG ---
 with tabs[4]:
