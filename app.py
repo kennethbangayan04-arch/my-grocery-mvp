@@ -101,45 +101,79 @@ with tabs[0]:
             save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
         if c_clear.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# --- TAB 2: INVENTORY (Registration Fixed) ---
+# --- TAB 2: INVENTORY (With Bought Price & SRP) ---
 with tabs[1]:
     st.subheader(D["inv_h"])
-    for k, v in st.session_state.db['inventory'].items():
-        if v['stock'] <= v['min_alert']: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
+    # 1. Low Stock Alerts
+    for k, v in st.session_state.db['inventory'].items():
+        if v['stock'] <= v['min_alert']: 
+            st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+    
+    # 2. Registration Form (Updated with 3 columns)
     with st.expander(D["btn_reg"]):
         with st.form("reg_form", clear_on_submit=True):
             c_i = st.text_input(D["code"])
             n_i = st.text_input(D["name"]).upper()
+            
+            # Create 3 columns: Stock, Bought Price, and SRP
             col_s, col_b, col_p = st.columns(3)
             s_i = col_s.number_input(D["stock"], min_value=0)
-            b_i = col_b.number_input(D["bought"], min_value=0.0) # Added Bought Price
+            b_i = col_b.number_input(D["bought"], min_value=0.0) # <--- ADDED BOUGHT PRICE
             p_i = col_p.number_input(D["srp"], min_value=0.0)
+            
             if st.form_submit_button(D["btn_reg"]):
                 if c_i and n_i:
-                    st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "bought": b_i, "price": p_i, "min_alert": 5}
-                    save_data(); st.rerun()
+                    st.session_state.db['inventory'][c_i] = {
+                        "name": n_i, 
+                        "stock": s_i, 
+                        "bought": b_i, # <--- SAVING BOUGHT PRICE
+                        "price": p_i, 
+                        "min_alert": 5
+                    }
+                    save_data()
+                    st.rerun()
 
+    # 3. Dynamic Inventory List
     if st.session_state.db['inventory']:
         st.write("---")
-        h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
-        h1.write(f"**{D['code']}**"); h2.write(f"**{D['name']}**"); h3.write(f"**STOCK**")
-        h4.write(f"**SRP**"); h5.write(f"**{D['add_stock']}**"); h6.write(f"**{D['action']}**")
+        # Added a column for BOUGHT (Headers)
+        h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 2, 1, 1, 1, 1.5, 1])
+        h1.write(f"**{D['code']}**")
+        h2.write(f"**{D['name'].upper()}**")
+        h3.write(f"**STOCK**")
+        h4.write(f"**BOUGHT**") # <--- NEW HEADER
+        h5.write(f"**SRP**")
+        h6.write(f"**{D['add_stock']}**")
+        h7.write(f"**{D['action']}**")
         st.divider()
 
         for code, det in list(st.session_state.db['inventory'].items()):
-            r1, r2, r3, r4, r5, r6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
-            r1.write(f"`{code}`"); r2.write(det['name']); r3.write(str(det['stock']))
-            r4.write(f"₱{det['price']:.2f}")
-            with r5:
+            r1, r2, r3, r4, r5, r6, r7 = st.columns([1.5, 2, 1, 1, 1, 1.5, 1])
+            
+            r1.write(f"`{code}`")
+            r2.write(det['name'])
+            r3.write(f"**{det['stock']}**")
+            
+            # Displaying the Money values
+            # .get() is used here so old items without a 'bought' price won't crash the app
+            r4.write(f"₱{det.get('bought', 0.0):.2f}") 
+            r5.write(f"₱{det['price']:.2f}")
+            
+            with r6:
                 with st.popover("➕"):
                     add_amt = st.number_input(D["qty"], min_value=1, key=f"a_{code}")
                     if st.button(D["btn_save"], key=f"b_{code}"):
                         st.session_state.db['inventory'][code]['stock'] += add_amt
-                        save_data(); st.rerun()
-            if r6.button("🗑️", key=f"d_{code}"):
-                del st.session_state.db['inventory'][code]; save_data(); st.rerun()
-
+                        save_data()
+                        st.rerun()
+                        
+            if r7.button("🗑️", key=f"d_{code}"):
+                del st.session_state.db['inventory'][code]
+                save_data()
+                st.rerun()
+    else:
+        st.info("Inventory is empty.")
 # --- TAB 3: EXPENSES ---
 with tabs[2]:
     st.subheader(D["rec_h"])
