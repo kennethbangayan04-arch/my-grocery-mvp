@@ -115,52 +115,59 @@ with tabs[3]:
     c2.metric(D["exp"], f"₱{exp:,.2f}")
     c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
 
-# TAB 5: UTANG (With Delete/Paid Function)
+# --- TAB 5: UTANG TRACKER (Capitalized & Organized) ---
 with tabs[4]:
     st.subheader(D["utang_header"])
     
-    # 1. Entry Form
+    # 1. Input Form
     with st.form("utang_form", clear_on_submit=True):
         u_n = st.text_input(D["cust"])
         u_p = st.text_input(D["phone"])
         u_a = st.number_input(D["debt_amt"], min_value=0.0)
         if st.form_submit_button(f"➕ {D['utang_header']}"):
             if u_n and u_p:
-                st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+                # Adding the current date automatically
+                st.session_state.db['debts'].append({
+                    "NAME": u_n.upper(), # Auto-capitalize the name for the record
+                    "PHONE": u_p, 
+                    "AMOUNT": u_a, 
+                    "DATE": str(datetime.now().strftime("%Y-%m-%d"))
+                })
                 save_data()
                 st.rerun()
 
-    # 2. List and Actions
+    # 2. The Professional Table
     if st.session_state.db['debts']:
         st.markdown("---")
         
-        # Display as a nice table first
+        # Convert to DataFrame for a clean table
         d_df = pd.DataFrame(st.session_state.db['debts'])
-        st.table(d_df)
         
-        # --- DELETE / PAID SECTION ---
+        # ENSURE HEADERS ARE CAPITALIZED
+        # This makes it look like a formal business report
+        d_df.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
+        
+        st.table(d_df) # Using st.table instead of dataframe for a cleaner "static" look
+        
         st.write("---")
+        
+        # 3. Actions (Reminder & Delete)
         col_remind, col_delete = st.columns(2)
         
         with col_remind:
             st.subheader(D["btn_sms"])
-            sel_idx = st.selectbox("Select Customer", range(len(st.session_state.db['debts'])), 
-                                   format_func=lambda x: st.session_state.db['debts'][x]['name'])
+            # Dropdown for selecting which person to remind/delete
+            sel_idx = st.selectbox("Select Record", range(len(st.session_state.db['debts'])), 
+                                   format_func=lambda x: st.session_state.db['debts'][x]['NAME'])
             
             pers = st.session_state.db['debts'][sel_idx]
             
-            # Bilingual Message
-            msg = f"Paalala mula sa tindahan: May utang po na ₱{pers['amount']:,.2f}. Salamat!" if lang == "Tagalog" else f"Reminder from the store: Balance of ₱{pers['amount']:,.2f}. Thank you!"
+            # Bilingual Message Logic
+            msg = f"Paalala mula sa tindahan: May utang po na ₱{pers['AMOUNT']:,.2f}. Salamat!" if lang == "Tagalog" else f"Reminder from store: Balance of ₱{pers['AMOUNT']:,.2f}. Thank you!"
             
-            st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+            st.link_button(D["btn_sms"], f"sms:{pers['PHONE']}?body={urllib.parse.quote(msg)}")
 
         with col_delete:
             st.subheader("Action")
-            # The "Delete" button
-            delete_label = "✅ Mark as Paid / Delete" if lang == "English" else "✅ Bayad na / Burahin"
-            if st.button(delete_label, type="primary"):
-                # Remove the selected person using their index
-                removed_person = st.session_state.db['debts'].pop(sel_idx)
-                save_data()
-                st.success(f"Removed {removed_person['name']} from list.")
-                st.rerun()
+            delete_label = "✅ Paid / Delete" if lang == "English" else "✅ Bayad na / Burahin"
+            if st.button(delete_label, type="
