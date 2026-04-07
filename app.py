@@ -147,46 +147,48 @@ with tabs[1]:
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
             c_i = st.text_input("Code")
-            n_i = st.text_input(D["name"]).upper()
-            col_s, col_p = st.columns(2)
-            s_i = col_s.number_input(D["stock"], min_value=0)
-            p_i = col_p.number_input(D["price"], min_value=0.0)
+            n_i = st.text_input(D["name"]).upper() # Auto-capitalize for professional look
+            s_i = st.number_input(D["stock"], min_value=0)
+            p_i = st.number_input(D["price"], min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
                 if c_i and n_i:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
-                    save_data(); st.rerun()
+                    save_data()
+                    st.rerun()
 
-    # 3. Interactive Inventory List (Custom Row Layout)
+    # 3. Dynamic Inventory Table with Delete Column
     if st.session_state.db['inventory']:
         st.write("---")
-        # Header Row
-        h1, h2, h3, h4, h5 = st.columns([2, 3, 1, 1, 1])
+        # Define Column Widths: Code (2), Name (3), Stock (1), Price (1), Alert (1), Action (1)
+        h1, h2, h3, h4, h5, h6 = st.columns([2, 3, 1, 1, 1, 1])
         h1.write("**CODE**")
         h2.write("**NAME**")
         h3.write("**STOCK**")
         h4.write("**PRICE**")
-        h5.write("**ACTION**")
+        h5.write("**ALERT**")
+        h6.write("**ACTION**")
         st.divider()
 
-        # Data Rows
-        # We loop through the dictionary to create a row for every product
+        # Loop through inventory to create rows
+        # We use list() so we can delete items without breaking the loop
         for code, details in list(st.session_state.db['inventory'].items()):
-            r1, r2, r3, r4, r5 = st.columns([2, 3, 1, 1, 1])
+            r1, r2, r3, r4, r5, r6 = st.columns([2, 3, 1, 1, 1, 1])
             
             r1.write(f"`{code}`")
             r2.write(details['name'])
             r3.write(str(details['stock']))
             r4.write(f"₱{details['price']:.2f}")
+            r5.write(str(details['min_alert']))
             
-            # The Delete Button on the far right
-            if r5.button("🗑️", key=f"del_{code}"):
+            # The Delete Button in the final column
+            if r6.button("🗑️", key=f"del_{code}"):
                 del st.session_state.db['inventory'][code]
                 save_data()
-                st.toast(f"Removed {details['name']}!") # Small notification
+                st.toast(f"Removed {details['name']}!") # Small feedback popup
                 st.rerun()
     else:
         st.info("No products registered yet.")
-
+        
     # 3. Current Inventory Display
     if st.session_state.db['inventory']:
         st.write("---")
