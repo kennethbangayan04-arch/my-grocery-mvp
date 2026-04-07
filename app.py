@@ -232,25 +232,6 @@ with tabs[3]:
         daily_sales = monthly_data.groupby(monthly_data['date'].dt.date)['total'].sum()
         st.line_chart(daily_sales)
 
-        # 5. DISPLAY METRICS
-        st.info(f"📅 {selected_month}")
-        c1, c2, c3 = st.columns(3)
-        c1.metric(D["rev"], f"₱{rev:,.2f}")
-        c2.metric(D["exp"], f"₱{monthly_exp:,.2f}")
-        c3.metric(D["prof"], f"₱{prof:,.2f}")
-        
-        # 6. VISUAL CHART (For Extra Credit!)
-        st.write("---")
-        st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
-        daily_sales = monthly_data.groupby(monthly_data['date'].dt.date)['total'].sum()
-        st.line_chart(daily_sales)
-        
-        with st.expander("View Monthly Log" if lang == "English" else "Tingnan ang Listahan"):
-            st.dataframe(monthly_data[[ 'date', 'item', 'total' ]], use_container_width=True)
-            
-    else:
-        st.info("Walang benta." if lang == "Tagalog" else "No sales yet.")
-
 # --- TAB 5: UTANG ---
 with tabs[4]:
     st.subheader(D["ut_h"])
