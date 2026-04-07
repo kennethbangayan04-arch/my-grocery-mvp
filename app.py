@@ -181,7 +181,7 @@ with tabs[3]:
     c2.metric(D["exp"], f"₱{exp:,.2f}")
     c3.metric(D["prof"], f"₱{prof:,.2f}")
 
-# --- TAB 5: UTANG  ---
+# --- TAB 5: UTANG (With Dynamic Column Fix) ---
 with tabs[4]:
     st.subheader(D["ut_h"])
     with st.form("u_form", clear_on_submit=True):
@@ -194,15 +194,22 @@ with tabs[4]:
                     "name": u_n.upper(), 
                     "phone": u_p, 
                     "amount": u_a,
-                    "date": str(datetime.now().date())
+                    "date": str(datetime.now().date()) # The 4th column
                 })
                 save_data(); st.rerun()
 
+    # --- THIS IS WHERE YOU ADD THE FIX ---
     if st.session_state.db['debts']:
         st.write("---")
         d_df = pd.DataFrame(st.session_state.db['debts'])
-        # Capitalize headers for the table
-        d_df.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
+        
+        # --- DYNAMIC COLUMN FIX ---
+        # This prevents the "ValueError" if some rows are missing the Date
+        if len(d_df.columns) == 4:
+            d_df.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
+        elif len(d_df.columns) == 3:
+            d_df.columns = ["NAME", "PHONE", "AMOUNT"]
+            
         st.table(d_df)
         
         col_rem, col_del = st.columns(2)
@@ -216,22 +223,18 @@ with tabs[4]:
             )
             pers = st.session_state.db['debts'][sel]
             
-            # --- DYNAMIC REMINDER MESSAGE ---
-            # Using your bilingual logic to craft the text
+            # Bilingual Message Logic
             store_name = "NEGOSYO PRO"
             if lang == "Tagalog":
-                msg = f"Magandang araw {pers['name']}! Paalala lang po mula sa {store_name} tungkol sa utang na ₱{pers['amount']:,.2f}. Maraming salamat!"
+                msg = f"Magandang araw {pers['name']}! Paalala mula sa {store_name} tungkol sa utang na ₱{pers['amount']:,.2f}."
             else:
-                msg = f"Good day {pers['name']}! This is a friendly reminder from {store_name} regarding your balance of ₱{pers['amount']:,.2f}. Thank you!"
+                msg = f"Good day {pers['name']}! Reminder from {store_name} regarding your balance of ₱{pers['amount']:,.2f}."
             
-            # This creates the SMS link
             st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
-            st.caption("Preview: " + msg)
 
         with col_del:
             st.markdown(f"### ✅ {D['btn_paid']}")
             if st.button(D["btn_paid"], type="primary", use_container_width=True):
-                removed = st.session_state.db['debts'].pop(sel)
+                st.session_state.db['debts'].pop(sel)
                 save_data()
-                st.success(f"Paid: {removed['name']}")
                 st.rerun()
