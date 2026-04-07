@@ -80,4 +80,5 @@ with tabs[0]:
     
     if b_in in st.session_state.db['inventory']:
         item = st.session_state.db['inventory'][b_in]
-        st.info(f"✨ **{item['name']}** | ₱{item['price']}
+        # Corrected Line 83:
+        st.info(f"✨ **{item['name']}** | ₱{item['price']} | {D['stock']}: {item['stock']}")
