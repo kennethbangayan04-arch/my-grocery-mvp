@@ -229,10 +229,13 @@ with tabs[2]:
         
     else:
         st.info("Walang nakatalang gasto." if lang == "Tagalog" else "No recorded expenses.")
-# --- TAB 4: REPORTS (Clean 0.00 Start) ---
+# --- TAB 4: REPORTS (Monthly Analysis - Fixed Calculation) ---
 with tabs[3]:
     st.subheader(D["rep_h"])
-    rev, exp, prof = 0.0, 0.0, 0.0
+    
+    # Initialize variables at zero (Steady State)
+    rev, total_expenses, gross_markup, net_prof = 0.0, 0.0, 0.0, 0.0
+    selected_month = datetime.now().strftime('%B %Y')
     
     if st.session_state.db['sales']:
         s_df = pd.DataFrame(st.session_state.db['sales'])
@@ -240,24 +243,48 @@ with tabs[3]:
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
         
         available_months = s_df['month_year'].unique()
-        selected_month = st.selectbox("Month", options=available_months)
+        selected_month = st.selectbox(
+            "Piliin ang Buwan" if lang == "Tagalog" else "Select Month", 
+            options=available_months,
+            index=len(available_months)-1
+        )
         
-        m_data = s_df[s_df['month_year'] == selected_month]
-        rev = m_data['total'].sum()
-        if 'srp' in m_data.columns and 'bought' in m_data.columns:
-            prof = (m_data['srp'] - m_data['bought']).sum()
+        # Filter sales for the selected month
+        m_sales = s_df[s_df['month_year'] == selected_month]
         
+        # 1. TOTAL REVENUE (Total cash from customers)
+        rev = m_sales['total'].sum()
+        
+        # 2. GROSS MARKUP (Profit from items alone: SRP - Cost)
+        if 'srp' in m_sales.columns and 'bought' in m_sales.columns:
+            # We calculate: (Selling Price - Cost Price) * Quantity
+            gross_markup = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
+        else:
+            gross_markup = rev * 0.20 # Fallback estimate
+            
+        # 3. OPERATING EXPENSES (From your Tab 3 entries)
         p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
         if not p_df.empty:
             p_df['date'] = pd.to_datetime(p_df['date'])
             p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
-            exp = p_df[p_df['month_year'] == selected_month]['total'].sum()
+            total_expenses = p_df[p_df['month_year'] == selected_month]['total'].sum()
 
+        # 4. NET PROFIT (The "Take Home" pay after all bills)
+        net_prof = gross_markup - total_expenses
+
+    # --- DISPLAY METRICS ---
+    st.info(f"📅 {selected_month}")
     c1, c2, c3 = st.columns(3)
     c1.metric(D["rev"], f"₱{rev:,.2f}")
-    c2.metric(D["exp"], f"₱{exp:,.2f}")
-    c3.metric(D["prof"], f"₱{prof:,.2f}")
-
+    c2.metric(D["exp"], f"₱{total_expenses:,.2f}")
+    # This now shows your actual Net Profit
+    c3.metric(D["prof"], f"₱{net_prof:,.2f}")
+    
+    if rev > 0:
+        st.write("---")
+        st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
+        daily_sales = m_sales.groupby(m_sales['date'].dt.date)['total'].sum()
+        st.line_chart(daily_sales)
 # --- TAB 5: UTANG (With Dynamic Column Fix) ---
 with tabs[4]:
     st.subheader(D["ut_h"])
