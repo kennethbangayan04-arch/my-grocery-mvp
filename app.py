@@ -5,6 +5,9 @@ import json
 import os
 import urllib.parse
 
+# TEMPORARY LINE: Delete this after you see 0.00
+st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+
 # --- 1. DATA ENGINE (Clean Slate Version) ---
 DB_FILE = 'negosyo_pro_master.json'
 
