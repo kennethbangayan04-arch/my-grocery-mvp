@@ -134,7 +134,7 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# --- TAB 2: INVENTORY (With Restock & Delete) ---
+# --- TAB 2: INVENTORY (Manual Restock & Delete) ---
 with tabs[1]:
     st.subheader(D["inv_header"])
     
@@ -143,7 +143,7 @@ with tabs[1]:
         if v['stock'] <= v['min_alert']: 
             st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
-    # 2. Registration Form (For NEW products)
+    # 2. Registration Form
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
             c_i = st.text_input("Barcode/Code")
@@ -156,34 +156,37 @@ with tabs[1]:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
                     save_data(); st.rerun()
 
-    # 3. Dynamic Inventory List
+    # 3. Dynamic Inventory List (With Manual Restock)
     if st.session_state.db['inventory']:
         st.write("---")
-        # Columns: Code, Name, Stock, Price, Restock, Delete
-        h1, h2, h3, h4, h5, h6 = st.columns([2, 3, 1, 1, 1.5, 1])
+        # Layout: Code, Name, Stock, Price, Restock Input, Action
+        h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 2, 1])
         h1.write("**CODE**")
         h2.write("**NAME**")
         h3.write("**STOCK**")
         h4.write("**PRICE**")
-        h5.write("**RESTOCK**") # New Column
+        h5.write("**ADD STOCK**") # Header for typing
         h6.write("**ACTION**")
         st.divider()
 
         for code, details in list(st.session_state.db['inventory'].items()):
-            r1, r2, r3, r4, r5, r6 = st.columns([2, 3, 1, 1, 1.5, 1])
+            r1, r2, r3, r4, r5, r6 = st.columns([1.5, 2.5, 1, 1, 2, 1])
             
             r1.write(f"`{code}`")
             r2.write(details['name'])
             r3.write(f"**{details['stock']}**")
             r4.write(f"₱{details['price']:.2f}")
             
-            # --- RESTOCK FEATURE ---
-            # Allows adding 10 units with one click
-            if r5.button("➕ Add 10", key=f"add_{code}"):
-                st.session_state.db['inventory'][code]['stock'] += 10
-                save_data()
-                st.toast(f"Added 10 units to {details['name']}!")
-                st.rerun()
+            # --- MANUAL RESTOCK INPUT ---
+            # Using a small form for each row so the user can type and hit 'Enter'
+            with r5:
+                with st.popover("➕ Add"):
+                    add_amt = st.number_input("How many?", min_value=1, key=f"amt_{code}", step=1)
+                    if st.button("Confirm", key=f"btn_{code}"):
+                        st.session_state.db['inventory'][code]['stock'] += add_amt
+                        save_data()
+                        st.toast(f"Added {add_amt} to {details['name']}!")
+                        st.rerun()
             
             # --- DELETE FEATURE ---
             if r6.button("🗑️", key=f"del_{code}"):
@@ -191,8 +194,7 @@ with tabs[1]:
                 save_data()
                 st.rerun()
     else:
-        st.info("Inventory is empty.")
-        
+        st.info("Inventory is empty.")        
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
     st.subheader(D["receipt_header"])
