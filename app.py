@@ -10,28 +10,10 @@ DB_FILE = 'negosyo_pro_master.json'
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: 
-                data = json.load(f)
-                # --- MIGRATION LOGIC ---
-                # Check every item in inventory; if 'cost' is missing, add it
-                for k, v in data['inventory'].items():
-                    if 'cost' not in v:
-                        v['cost'] = v.get('price', 0) * 0.8  # Assume 20% margin if unknown
-                    if 'price' not in v:
-                        v['price'] = 0
-                return data
-        except:
-            pass
-    # Return default if file is missing or corrupted
-    return {
-        'sales': [], 
-        'inventory': {
-            "4800016644801": {"name": "LUCKY ME", "stock": 20, "min_alert": 5, "cost": 12.0, "price": 15.0},
-            "12345": {"name": "RICE (1KG)", "stock": 50, "min_alert": 10, "cost": 45.0, "price": 55.0}
-        }, 
-        'purchase_receipts': [], 
-        'debts': []
-    }
+            with open(DB_FILE, 'r') as f: return json.load(f)
+        except: pass
+    return {'sales': [], 'inventory': {"4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 5, "price": 15}, "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 10, "price": 55}}, 'purchase_receipts': [], 'debts': []}
+
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
@@ -152,59 +134,21 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# --- TAB 2: INVENTORY (Cost vs. SRP) ---
+# TAB 2: INVENTORY
 with tabs[1]:
     st.subheader(D["inv_header"])
-    
-    # 1. Low Stock Alerts (Decision Support System)
     for k, v in st.session_state.db['inventory'].items():
-        if v['stock'] <= v['min_alert']: 
-            st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+        if v['stock'] <= v['min_alert']: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
-    # 2. Registration Form
-    with st.expander(f"➕ {D['btn_reg']}", expanded=False):
-        with st.form("add_form", clear_on_submit=True):
-            c_i = st.text_input("BARCODE / CODE")
-            n_i = st.text_input(D["name"]).upper() # Auto-capitalize product name
-            
-            col_s, col_c, col_p = st.columns(3)
-            s_i = col_s.number_input("STOCK", min_value=0)
-            cost_i = col_c.number_input("COST (BOUGHT)", min_value=0.0, help="Magkano mo binili?")
-            srp_i = col_p.number_input("SRP (SELLING)", min_value=0.0, help="Magkano mo ibebenta?")
-            
+    with st.expander(D["btn_reg"]):
+        with st.form("add_form"):
+            c_i = st.text_input("Code"); n_i = st.text_input(D["name"])
+            s_i = st.number_input(D["stock"], min_value=0); p_i = st.number_input(D["price"], min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
-                if c_i and n_i:
-                    st.session_state.db['inventory'][c_i] = {
-                        "name": n_i, 
-                        "stock": s_i, 
-                        "cost": cost_i, 
-                        "price": srp_i, # Keep 'price' key for compatibility with Tab 1
-                        "min_alert": 5
-                    }
-                    save_data()
-                    st.success(f"Registered {n_i}!")
-                    st.rerun()
+                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
+                save_data(); st.rerun()
+    st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'))
 
-    # 3. Professional Inventory Ledger
-    if st.session_state.db['inventory']:
-        st.write("---")
-        # Convert dictionary to DataFrame
-        inv_df = pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index').reset_index()
-        
-        # Calculate Markup (Tubo)
-        inv_df['MARKUP'] = inv_df['price'] - inv_df['cost']
-        
-        # Rename and Capitalize Headers
-        inv_df.columns = ["BARCODE", "NAME", "STOCK", "ALERT LEVEL", "COST", "SRP", "MARKUP"]
-        
-        # Reorder columns for better flow
-        inv_df = inv_df[["BARCODE", "NAME", "STOCK", "COST", "SRP", "MARKUP"]]
-        
-        st.table(inv_df)
-        
-        # 4. Business Insight Metric
-        total_inv_value = (inv_df['STOCK'] * inv_df['COST']).sum()
-        st.metric("TOTAL INVENTORY VALUE (AT COST)", f"₱{total_inv_value:,.2f}")
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
     st.subheader(D["receipt_header"])
