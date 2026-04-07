@@ -10,10 +10,28 @@ DB_FILE = 'negosyo_pro_master.json'
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: return json.load(f)
-        except: pass
-    return {'sales': [], 'inventory': {"4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 5, "price": 15}, "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 10, "price": 55}}, 'purchase_receipts': [], 'debts': []}
-
+            with open(DB_FILE, 'r') as f: 
+                data = json.load(f)
+                # --- MIGRATION LOGIC ---
+                # Check every item in inventory; if 'cost' is missing, add it
+                for k, v in data['inventory'].items():
+                    if 'cost' not in v:
+                        v['cost'] = v.get('price', 0) * 0.8  # Assume 20% margin if unknown
+                    if 'price' not in v:
+                        v['price'] = 0
+                return data
+        except:
+            pass
+    # Return default if file is missing or corrupted
+    return {
+        'sales': [], 
+        'inventory': {
+            "4800016644801": {"name": "LUCKY ME", "stock": 20, "min_alert": 5, "cost": 12.0, "price": 15.0},
+            "12345": {"name": "RICE (1KG)", "stock": 50, "min_alert": 10, "cost": 45.0, "price": 55.0}
+        }, 
+        'purchase_receipts': [], 
+        'debts': []
+    }
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
