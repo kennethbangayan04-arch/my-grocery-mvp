@@ -241,7 +241,8 @@ with tabs[2]:
         
     else:
         st.info("Walang nakatalang gasto." if lang == "Tagalog" else "No recorded expenses.")
-# --- TAB 4: REPORTS  ---
+        
+# --- TAB 4: REPORTS---
 with tabs[3]:
     st.subheader(D["rep_h"])
     
@@ -261,40 +262,50 @@ with tabs[3]:
         )
         
         # Filter sales for the selected month
-        m_sales = s_df[s_df['month_year'] == selected_month]
+        m_sales = s_df[s_df['month_year'] == selected_month].copy()
         
-        # 1. TOTAL REVENUE (Total cash from customers)
+        # --- CALCULATION LOGIC ---
         rev = m_sales['total'].sum()
-        
-        # 2. GROSS MARKUP (Profit from items alone: SRP - Cost)
         if 'srp' in m_sales.columns and 'bought' in m_sales.columns:
-            # We calculate: (Selling Price - Cost Price) * Quantity
             gross_markup = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
         else:
-            gross_markup = rev * 0.20 # Fallback estimate
+            gross_markup = rev * 0.20
             
-        # 3. OPERATING EXPENSES 
         p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
         if not p_df.empty:
             p_df['date'] = pd.to_datetime(p_df['date'])
             p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
             total_expenses = p_df[p_df['month_year'] == selected_month]['total'].sum()
 
-        # 4. NET PROFIT 
         net_prof = gross_markup - total_expenses
 
-    # --- DISPLAY METRICS ---
-    st.info(f"📅 {selected_month}")
-    c1, c2, c3 = st.columns(3)
-    c1.metric(D["rev"], f"₱{rev:,.2f}")
-    c2.metric(D["exp"], f"₱{total_expenses:,.2f}")
-    c3.metric(D["prof"], f"₱{net_prof:,.2f}")
-    
-    if rev > 0:
-        st.write("---")
-        st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
-        daily_sales = m_sales.groupby(m_sales['date'].dt.date)['total'].sum()
-        st.line_chart(daily_sales)
+        # --- DISPLAY METRICS ---
+        st.info(f"📅 {selected_month}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric(D["rev"], f"₱{rev:,.2f}")
+        c2.metric(D["exp"], f"₱{total_expenses:,.2f}")
+        c3.metric(D["prof"], f"₱{net_prof:,.2f}")
+        
+        # --- FIXED GRAPH LOGIC ---
+        if rev > 0:
+            st.write("---")
+            st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta Kada Araw")
+            
+            # 1. Strip the time from the datetime (leaving only the date)
+            m_sales['day'] = m_sales['date'].dt.date
+            
+            # 2. Group by day and sum the totals
+            # We sort the index to ensure the graph goes from start of month to end
+            daily_trend = m_sales.groupby('day')['total'].sum().sort_index()
+            
+            # 3. Render the chart
+            st.line_chart(daily_trend)
+            
+            with st.expander("Show Daily Breakdown" if lang == "English" else "Ipakita ang Detalye"):
+                st.table(daily_trend)
+        
+    else:
+        st.info("No sales data available for this month." if lang == "English" else "Walang datos ng benta para sa buwang ito.")
         
 # --- TAB 5: UTANG ---
 with tabs[4]:
