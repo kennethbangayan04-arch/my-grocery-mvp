@@ -3,205 +3,129 @@ import pandas as pd
 from datetime import datetime
 import json
 import os
+import urllib.parse
 
 # --- 1. DATA ENGINE ---
 DB_FILE = 'negosyo_pro_master.json'
-
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: 
-                return json.load(f)
-        except:
-            pass
-    return {
-        'sales': [], 
-        'inventory': {
-            "4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 10, "price": 15},
-            "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 15, "price": 55}
-        }, 
-        'purchase_receipts': [], 
-        'debts': []
-    }
+            with open(DB_FILE, 'r') as f: return json.load(f)
+        except: pass
+    return {'sales': [], 'inventory': {"4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 5, "price": 15}, "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 10, "price": 55}}, 'purchase_receipts': [], 'debts': []}
 
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
 def save_data():
-    with open(DB_FILE, 'w') as f: 
-        json.dump(st.session_state.db, f)
+    with open(DB_FILE, 'w') as f: json.dump(st.session_state.db, f)
 
-# --- 2. UI & LANGUAGE ---
+# --- 2. THE DICTIONARY (Every Word is Here) ---
 st.set_page_config(page_title="Negosyo Pro MVP", layout="wide")
-lang = st.sidebar.radio("Language / Wika", ["English", "Tagalog"])
+lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
-T = {
-    "English": ["Quick Sale", "Inventory Hub", "Purchase Receipts", "Financial Reports", "Utang Tracker", "Add Sale", "Low Stock!", "Register Product"],
-    "Tagalog": ["Mabilisang Benta", "Sentro ng Imbentaryo", "Resibo ng Binili", "Ulat ng Pananalapi", "Listahan ng Utang", "Itala ang Benta", "Mababa ang Stock!", "I-rehistro ang Produkto"]
+D = {
+    "English": {
+        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Purchase Receipts", "📊 Reports", "💳 Utang Tracker"],
+        "sale_header": "Register a Sale",
+        "input_code": "Scan/Type Barcode",
+        "btn_sell": "Complete Sale",
+        "inv_header": "Stock Management",
+        "btn_reg": "Register New Product",
+        "name": "Product Name", "stock": "Current Stock", "price": "Price",
+        "receipt_header": "Log Grocery Receipts",
+        "store": "Store Name", "amt": "Amount Spent", "photo": "Upload Photo",
+        "btn_save": "Save to Archive",
+        "rep_header": "Financial Summary",
+        "rev": "Total Sales", "exp": "Total Expenses", "prof": "Net Profit",
+        "utang_header": "Debt Management",
+        "cust": "Customer Name", "phone": "Mobile Number", "debt_amt": "Debt Amount",
+        "btn_sms": "Send SMS Reminder",
+        "low_stock": "⚠️ LOW STOCK!"
+    },
+    "Tagalog": {
+        "tabs": ["⚡ Mabilisang Benta", "📦 Imbentaryo", "🧾 Resibo ng Binili", "📊 Mga Ulat", "💳 Listahan ng Utang"],
+        "sale_header": "Itala ang Benta",
+        "input_code": "I-scan/I-type ang Barcode",
+        "btn_sell": "Tapusin ang Benta",
+        "inv_header": "Pamamahala ng Stock",
+        "btn_reg": "I-rehistro ang Produkto",
+        "name": "Pangalan ng Produkto", "stock": "Bilang ng Stock", "price": "Presyo",
+        "receipt_header": "Itala ang mga Resibo",
+        "store": "Pangalan ng Tindahan", "amt": "Halagang Nagastos", "photo": "I-upload ang Larawan",
+        "btn_save": "I-save sa Archive",
+        "rep_header": "Ulat ng Kita at Gasto",
+        "rev": "Kabuuang Benta", "exp": "Kabuuang Gasto", "prof": "Netong Kita",
+        "utang_header": "Listahan ng mga Utang",
+        "cust": "Pangalan ng Customer", "phone": "Numero ng Telepono", "debt_amt": "Halaga ng Utang",
+        "btn_sms": "Magpadala ng SMS",
+        "low_stock": "⚠️ MABABA ANG STOCK!"
+    }
 }[lang]
 
-st.title(f"🏪 Negosyo Pro: {T[3]}")
-tabs = st.tabs([T[0], T[1], T[2], T[3], T[4]])
+# --- 3. UI LAYOUT ---
+st.title(f"🏪 Negosyo Pro")
+tabs = st.tabs(D["tabs"])
 
-# --- TAB 1: QUICK SALE ---
+# TAB 1: QUICK SALE
 with tabs[0]:
-    st.subheader(T[0])
-    b_in = st.text_input("Scan/Type Code", key="sale_in")
+    st.subheader(D["sale_header"])
+    b_in = st.text_input(D["input_code"], key="sale_in")
     if b_in in st.session_state.db['inventory']:
         item = st.session_state.db['inventory'][b_in]
-        st.info(f"**{item['name']}** | ₱{item['price']} | Stock: {item['stock']}")
-        if st.button(T[5]):
-            if item['stock'] > 0:
-                st.session_state.db['inventory'][b_in]['stock'] -= 1
-                st.session_state.db['sales'].append({
-                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
-                    "item": item['name'], 
-                    "total": item['price']
-                })
-                save_data()
-                st.success("Sold!")
-                st.rerun()
-            else:
-                st.error("Out of Stock!")
+        st.info(f"**{item['name']}** | ₱{item['price']}")
+        if st.button(D["btn_sell"]):
+            st.session_state.db['inventory'][b_in]['stock'] -= 1
+            st.session_state.db['sales'].append({"date": str(datetime.now().date()), "item": item['name'], "total": item['price']})
+            save_data(); st.rerun()
 
-# --- TAB 2: INVENTORY ---
+# TAB 2: INVENTORY
 with tabs[1]:
-    with st.expander(f"➕ {T[7]}"):
-        with st.form("manual_add"):
-            c_in = st.text_input("Code")
-            n_in = st.text_input("Name")
-            s_in = st.number_input("Stock", min_value=0)
-            p_in = st.number_input("Price", min_value=0.0)
-            if st.form_submit_button(T[7]):
-                st.session_state.db['inventory'][c_in] = {"name": n_in, "stock": s_in, "price": p_in, "min_alert": 5}
-                save_data()
-                st.rerun()
-    st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'), use_container_width=True)
+    st.subheader(D["inv_header"])
+    for k, v in st.session_state.db['inventory'].items():
+        if v['stock'] <= v['min_alert']: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+    
+    with st.expander(D["btn_reg"]):
+        with st.form("add_form"):
+            c_i = st.text_input("Code"); n_i = st.text_input(D["name"])
+            s_i = st.number_input(D["stock"], min_value=0); p_i = st.number_input(D["price"], min_value=0.0)
+            if st.form_submit_button(D["btn_reg"]):
+                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
+                save_data(); st.rerun()
+    st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'))
 
-# --- TAB 3: PURCHASE RECEIPTS (Expense & Photo Archive) ---
+# TAB 3: RECEIPTS (Expense)
 with tabs[2]:
-    st.subheader(T[2]) # "Purchase Receipts" or "Resibo ng Binili"
-    st.info("Snap a photo of your grocery/wholesaler receipt to track your business expenses.")
-    
-    # 1. Upload Form
-    with st.form("purchase_form", clear_on_submit=True):
-        col_a, col_b = st.columns(2)
-        store_name = col_a.text_input("Store Name (e.g. Puregold, Market)")
-        total_spent = col_b.number_input("Total Amount Spent (₱)", min_value=0.0)
-        
-        # This creates the "Browse" or "Take Photo" button
-        uploaded_file = st.file_uploader("📸 Upload Receipt Photo", type=['png', 'jpg', 'jpeg'])
-        
-        notes = st.text_area("Items Bought (e.g. 1 sack Rice, 5 cases Noodles)")
-        
-        submit_receipt = st.form_submit_button("💾 Save to Digital Archive")
-        
-        if submit_receipt:
-            if store_name and total_spent > 0:
-                # Store the data
-                receipt_entry = {
-                    "date": str(datetime.now().strftime("%Y-%m-%d")),
-                    "store": store_name,
-                    "amount": total_spent,
-                    "items": notes,
-                    "photo_id": uploaded_file.name if uploaded_file else "No Photo"
-                }
-                st.session_state.db['purchase_receipts'].append(receipt_entry)
-                save_data()
-                st.success(f"Receipt from {store_name} archived successfully!")
-                st.rerun()
-            else:
-                st.error("Please enter the Store Name and Amount.")
+    st.subheader(D["receipt_header"])
+    with st.form("p_form"):
+        s_n = st.text_input(D["store"]); a_p = st.number_input(D["amt"])
+        u_p = st.file_uploader(D["photo"], type=['jpg','png'])
+        if st.form_submit_button(D["btn_save"]):
+            st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().date()), "store": s_n, "total": a_p})
+            save_data(); st.success("Saved!"); st.rerun()
+    st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']))
 
-    # 2. Display the History Table
-    st.markdown("---")
-    st.subheader("📜 Expense History")
-    if st.session_state.db['purchase_receipts']:
-        expense_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
-        # Rename for cleaner display
-        expense_df.columns = ["Date", "Store", "Amount (₱)", "Details", "Receipt File"]
-        st.dataframe(expense_df, use_container_width=True)
-    else:
-        st.info("No receipts archived yet.")
-
-# --- TAB 4: FINANCIAL REPORTS ---
+# TAB 4: REPORTS
 with tabs[3]:
-    st.header(T[3])
-    
-    # Calculate Totals
-    total_revenue = sum([s['total'] for s in st.session_state.db['sales']])
-    total_expenses = sum([p['total'] for p in st.session_state.db['purchase_receipts']])
-    net_profit = total_revenue - total_expenses
-    
-    # Display Metrics
+    st.subheader(D["rep_header"])
+    rev = sum([s['total'] for s in st.session_state.db['sales']])
+    exp = sum([p['total'] for p in st.session_state.db['purchase_receipts']])
     c1, c2, c3 = st.columns(3)
-    
-    # Using simple strings to avoid f-string formatting errors
-    sales_text = "₱{:,.2f}".format(total_revenue)
-    exp_text = "₱{:,.2f}".format(total_expenses)
-    profit_text = "₱{:,.2f}".format(net_profit)
-    
-    c1.metric("Total Sales", sales_text)
-    c2.metric("Total Expenses", exp_text, delta_color="inverse")
-    
-    if net_profit >= 0:
-        c3.metric("Net Profit", profit_text, delta=profit_text)
-    else:
-        c3.metric("Net Loss", profit_text, delta=profit_text, delta_color="normal")
+    c1.metric(D["rev"], f"₱{rev:,.2f}")
+    c2.metric(D["exp"], f"₱{exp:,.2f}")
+    c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
 
-# --- TAB 5: UTANG TRACKER ---
+# TAB 5: UTANG
 with tabs[4]:
-    st.subheader(T[4])
-    
-    # 1. Register New Debt
-    with st.expander("➕ Register New Utang", expanded=True):
-        u_col1, u_col2, u_col3 = st.columns(3)
-        u_name = u_col1.text_input("Customer Name")
-        u_phone = u_col2.text_input("Mobile Number (e.g. 09171234567)")
-        u_amt = u_col3.number_input("Amount Owed (₱)", min_value=0.0)
-        
-        if st.button("📝 Save Debt Record"):
-            if u_name and u_phone:
-                st.session_state.db['debts'].append({
-                    "name": u_name, "phone": u_phone, "amount": u_amt, "date": str(datetime.now().date())
-                })
-                save_data()
-                st.success(f"Recorded debt for {u_name}!")
-                st.rerun()
-            else:
-                st.error("Please provide Name and Mobile Number.")
-
-    # 2. Display Table
+    st.subheader(D["utang_header"])
+    u_n = st.text_input(D["cust"]); u_p = st.text_input(D["phone"]); u_a = st.number_input(D["debt_amt"])
+    if st.button(f"➕ {D['utang_header']}"):
+        st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+        save_data(); st.rerun()
     if st.session_state.db['debts']:
-        st.markdown("### Active Debts")
-        debt_df = pd.DataFrame(st.session_state.db['debts'])
-        st.dataframe(debt_df, use_container_width=True)
-        
-        st.markdown("---")
-        
-        # 3. SMS REMINDER BUTTON (The New Feature)
-        st.subheader("📲 Send Reminder")
-        selected_name = st.selectbox("Select Customer", [d['name'] for d in st.session_state.db['debts']])
-        
-        # Get data for selected person
-        person = next(item for item in st.session_state.db['debts'] if item['name'] == selected_name)
-        
-        # Format the Message
-        reminder_msg = "Good day {}, paalala lang po sa inyong utang na ₱{:,.2f}. Salamat!".format(
-            person['name'], person['amount']
-        )
-        
-        # Create the SMS Link (sms:number?body=message)
-        # Note: We use quote to handle spaces and symbols in the URL
-        import urllib.parse
-        encoded_msg = urllib.parse.quote(reminder_msg)
-        sms_link = f"sms:{person['phone']}?body={encoded_msg}"
-        
-        st.info(f"**Message Preview:** {reminder_msg}")
-        
-        # The Action Button
-        st.link_button(f"✉️ Send SMS to {person['name']}", sms_link)
-        
-        st.caption("Note: This button will open your phone's Messaging app with the text already typed out.")
-    else:
-        st.info("No credit records found.")
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        st.table(d_df)
+        sel = st.selectbox(D["cust"], d_df['name'])
+        pers = next(i for i in st.session_state.db['debts'] if i['name'] == sel)
+        msg = f"Paalala sa utang: ₱{pers['amount']}"
+        st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
