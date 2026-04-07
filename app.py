@@ -5,29 +5,24 @@ import json
 import os
 import urllib.parse
 
-# --- 1. DATA ENGINE (Clean Slate Version) ---
+# --- 1. DATA ENGINE ---
 DB_FILE = 'negosyo_pro_master.json'
-
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: 
-                data = json.load(f)
-                # Migration: Ensure all items have BOUGHT and SRP keys
-                for k, v in data['inventory'].items():
-                    if "BOUGHT" not in v: v["BOUGHT"] = v.get("price", 0) * 0.8
-                    if "SRP" not in v: v["SRP"] = v.get("price", 0)
-                return data
-        except: 
-            pass
-    
-    # START WITH EMPTY DATA (No Lucky Me, No Rice)
-    return {
-        'sales': [], 
-        'inventory': {}, # Clean inventory for your demo
-        'purchase_receipts': [], 
-        'debts': []
-    }
+            with open(DB_FILE, 'r') as f: return json.load(f)
+        except: pass
+    return {'sales': [], 'inventory': {"4800016644801": {"name": "Lucky Me", "stock": 20, "min_alert": 5, "price": 15}, "12345": {"name": "Rice (1kg)", "stock": 50, "min_alert": 10, "price": 55}}, 'purchase_receipts': [], 'debts': []}
+
+if 'db' not in st.session_state:
+    st.session_state.db = load_data()
+
+def save_data():
+    with open(DB_FILE, 'w') as f: json.dump(st.session_state.db, f)
+
+# --- 2. THE DICTIONARY (Every Word is Here) ---
+st.set_page_config(page_title="Negosyo Pro MVP", layout="wide")
+lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
 D = {
     "English": {
