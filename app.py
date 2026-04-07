@@ -296,9 +296,11 @@ with tabs[3]:
         daily_sales = m_sales.groupby(m_sales['date'].dt.date)['total'].sum()
         st.line_chart(daily_sales)
         
-# --- TAB 5: UTANG (Fixed SMS Logic) ---
+# --- TAB 5: UTANG ---
 with tabs[4]:
     st.subheader(D["ut_h"])
+    
+    # 1. Entry Form
     with st.form("u_form", clear_on_submit=True):
         u_n = st.text_input(D["cust"])
         u_p = st.text_input(D["phone"])
@@ -313,47 +315,51 @@ with tabs[4]:
                 })
                 save_data(); st.rerun()
 
+    # 2. List and Actions
     if st.session_state.db['debts']:
         st.write("---")
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
+        # Header Fix
         if len(d_df.columns) == 4:
             d_df.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
         elif len(d_df.columns) == 3:
             d_df.columns = ["NAME", "PHONE", "AMOUNT"]
-            
         st.table(d_df)
+        
+        st.markdown("### 🛠️ " + D["action"])
+        
+        # THE SELECTOR (Crucial: Must have a unique key)
+        sel_idx = st.selectbox(
+            "Piliin ang Customer" if lang == "Tagalog" else "Select Customer", 
+            range(len(st.session_state.db['debts'])), 
+            format_func=lambda x: st.session_state.db['debts'][x]['name'],
+            key="active_debtor_selection"
+        )
+        
+        # Get the EXACT person currently selected
+        current_pers = st.session_state.db['debts'][sel_idx]
         
         col_rem, col_del = st.columns(2)
         
         with col_rem:
-            st.markdown(f"### 📱 {D['btn_sms']}")
-            # FIX: Added a unique 'key' so Streamlit tracks this specific selection
-            sel_idx = st.selectbox(
-                "Piliin ang Customer" if lang == "Tagalog" else "Select Customer", 
-                range(len(st.session_state.db['debts'])), 
-                format_func=lambda x: st.session_state.db['debts'][x]['name'],
-                key="debt_selector_dropdown" 
-            )
-            
-            # Now we pull the specific data for the SELECTED index
-            selected_pers = st.session_state.db['debts'][sel_idx]
-            
+            # Re-calculating the message every time the selection changes
             store_name = "NEGOSYO PRO"
             if lang == "Tagalog":
-                msg = f"Magandang araw {selected_pers['name']}! Paalala mula sa {store_name} tungkol sa utang na ₱{selected_pers['amount']:,.2f}."
+                msg = f"Magandang araw {current_pers['name']}! Paalala mula sa {store_name} tungkol sa utang na ₱{current_pers['amount']:,.2f}. Salamat!"
             else:
-                msg = f"Good day {selected_pers['name']}! Reminder from {store_name} regarding your balance of ₱{selected_pers['amount']:,.2f}."
+                msg = f"Good day {current_pers['name']}! Reminder from {store_name} regarding your balance of ₱{current_pers['amount']:,.2f}. Thanks!"
             
-            # The button now uses the specific selected_pers data
-            st.link_button(D["btn_sms"], f"sms:{selected_pers['phone']}?body={urllib.parse.quote(msg)}")
-            st.caption(f"Receiver: {selected_pers['name']} ({selected_pers['phone']})")
+            # The URL-encoded link
+            sms_link = f"sms:{current_pers['phone']}?body={urllib.parse.quote(msg)}"
+            
+            # THE BUTTON: Now it is explicitly tied to the current selection
+            st.link_button(f"📲 {D['btn_sms']}", sms_link, use_container_width=True)
+            st.caption(f"Will send to: **{current_pers['name']}**")
 
         with col_del:
-            st.markdown(f"### ✅ {D['btn_paid']}")
-            if st.button(D["btn_paid"], type="primary", use_container_width=True):
-                # Ensure we pop the SAME index we selected
-                removed = st.session_state.db['debts'].pop(sel_idx)
+            if st.button(D["btn_paid"], type="primary", use_container_width=True, key="pay_btn"):
+                st.session_state.db['debts'].pop(sel_idx)
                 save_data()
-                st.success(f"Paid: {removed['name']}")
+                st.success("Record Updated!")
                 st.rerun()
