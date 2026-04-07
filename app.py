@@ -296,7 +296,7 @@ with tabs[3]:
         daily_sales = m_sales.groupby(m_sales['date'].dt.date)['total'].sum()
         st.line_chart(daily_sales)
         
-# --- TAB 5: UTANG  ---
+# --- TAB 5: UTANG (Fixed SMS Logic) ---
 with tabs[4]:
     st.subheader(D["ut_h"])
     with st.form("u_form", clear_on_submit=True):
@@ -328,25 +328,32 @@ with tabs[4]:
         
         with col_rem:
             st.markdown(f"### 📱 {D['btn_sms']}")
-            sel = st.selectbox(
+            # FIX: Added a unique 'key' so Streamlit tracks this specific selection
+            sel_idx = st.selectbox(
                 "Piliin ang Customer" if lang == "Tagalog" else "Select Customer", 
                 range(len(st.session_state.db['debts'])), 
-                format_func=lambda x: st.session_state.db['debts'][x]['name']
+                format_func=lambda x: st.session_state.db['debts'][x]['name'],
+                key="debt_selector_dropdown" 
             )
-            pers = st.session_state.db['debts'][sel]
             
-            # Bilingual Message Logic
+            # Now we pull the specific data for the SELECTED index
+            selected_pers = st.session_state.db['debts'][sel_idx]
+            
             store_name = "NEGOSYO PRO"
             if lang == "Tagalog":
-                msg = f"Magandang araw {pers['name']}! Paalala mula sa {store_name} tungkol sa utang na ₱{pers['amount']:,.2f}."
+                msg = f"Magandang araw {selected_pers['name']}! Paalala mula sa {store_name} tungkol sa utang na ₱{selected_pers['amount']:,.2f}."
             else:
-                msg = f"Good day {pers['name']}! Reminder from {store_name} regarding your balance of ₱{pers['amount']:,.2f}."
+                msg = f"Good day {selected_pers['name']}! Reminder from {store_name} regarding your balance of ₱{selected_pers['amount']:,.2f}."
             
-            st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+            # The button now uses the specific selected_pers data
+            st.link_button(D["btn_sms"], f"sms:{selected_pers['phone']}?body={urllib.parse.quote(msg)}")
+            st.caption(f"Receiver: {selected_pers['name']} ({selected_pers['phone']})")
 
         with col_del:
             st.markdown(f"### ✅ {D['btn_paid']}")
             if st.button(D["btn_paid"], type="primary", use_container_width=True):
-                st.session_state.db['debts'].pop(sel)
+                # Ensure we pop the SAME index we selected
+                removed = st.session_state.db['debts'].pop(sel_idx)
                 save_data()
+                st.success(f"Paid: {removed['name']}")
                 st.rerun()
