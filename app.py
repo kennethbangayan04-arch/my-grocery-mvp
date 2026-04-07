@@ -330,29 +330,36 @@ with tabs[2]:
             save_data(); st.success("Saved!"); st.rerun()
     st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']))
 
-# --- TAB 4: REPORTS (With Safety Check) ---
+# --- TAB 4: REPORTS (With Data Validation) ---
 with tabs[3]:
     st.subheader(D["rep_h"])
     s_df = pd.DataFrame(st.session_state.db['sales'])
+    
+    # Calculate expenses from receipts
     exp = sum([p['total'] for p in st.session_state.db['purchase_receipts']])
     
     if not s_df.empty:
+        # 1. Total Revenue
         rev = s_df['total'].sum()
         
-        # SAFETY CHECK: Only calculate profit if 'srp' and 'bought' exist in the sales data
+        # 2. Profit Calculation with Safety Check
+        # If 'srp' or 'bought' are missing from old data, we use a default 0
         if 'srp' in s_df.columns and 'bought' in s_df.columns:
             prof = (s_df['srp'] - s_df['bought']).sum()
         else:
-            # Fallback for old data: assume a 20% margin if the columns are missing
-            prof = rev * 0.20 
+            # Fallback for old data: Estimate profit at 0 or a fixed margin
+            prof = 0.0 
             
         c1, c2, c3 = st.columns(3)
         c1.metric(D["rev"], f"₱{rev:,.2f}")
         c2.metric(D["exp"], f"₱{exp:,.2f}")
         c3.metric(D["prof"], f"₱{prof:,.2f}")
+        
+        st.write("---")
+        st.write("Sales Log:")
+        st.dataframe(s_df)
     else:
         st.info("Walang benta." if lang == "Tagalog" else "No sales yet.")
-
 # TAB 5: UTANG (With Delete/Paid Function)
 with tabs[4]:
     st.subheader(D["utang_header"])
