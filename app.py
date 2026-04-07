@@ -93,26 +93,26 @@ with tabs[0]:
                 st.rerun()
             else: st.error("Out of stock!" if lang == "English" else "Wala ng stock!")
 
-    if st.session_state.cart:
-        st.write("---")
-        st.markdown(f"### {D['cart_h']}")
-        cart_df = pd.DataFrame(st.session_state.cart)
-        cart_df.columns = [D["code"], D["name"].upper(), D["qty"].upper(), "PRICE", "SUBTOTAL"]
-        st.table(cart_df)
-        total_bill = cart_df['SUBTOTAL'].sum()
-        st.header(f"{D['total']}: ₱{total_bill:,.2f}")
-        
-        c_pay, c_clear = st.columns(2)
-        if c_pay.button(D["btn_checkout"], type="primary", use_container_width=True):
+    # FINAL CHECKOUT BUTTON FIX
+        if c_pay.button(D["btn_sell"], type="primary", use_container_width=True):
             for entry in st.session_state.cart:
+                # Deduct stock
                 st.session_state.db['inventory'][entry['code']]['stock'] -= entry['qty']
+                
+                # Save FULL data for reports
                 st.session_state.db['sales'].append({
                     "date": str(datetime.now().strftime("%Y-%m-%d %H:%M")), 
-                    "item": entry['name'], "total": entry['subtotal']
+                    "item": entry['name'], 
+                    "qty": entry['qty'],
+                    "bought": entry.get('bought', entry['price'] * 0.8), # Ensure cost is saved
+                    "srp": entry['price'], # Ensure selling price is saved
+                    "total": entry['subtotal']
                 })
-            save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
-        if c_clear.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
-
+            save_data()
+            st.session_state.cart = []
+            st.balloons()
+            st.rerun()
+            
 # --- TAB 2: INVENTORY ---
 with tabs[1]:
     st.subheader(D["inv_h"])
