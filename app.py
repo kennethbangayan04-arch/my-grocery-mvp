@@ -192,6 +192,14 @@ with tabs[4]:
                 save_data(); st.rerun()
 
     if st.session_state.db['debts']:
-        st.table(pd.DataFrame(st.session_state.db['debts']))
-        if st.button(D["btn_paid"], type="primary"):
-            st.session_state.db['debts'] = []; save_data(); st.rerun()
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        st.table(d_df)
+        col_rem, col_del = st.columns(2)
+        with col_rem:
+            sel = st.selectbox(D["cust"], range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'])
+            pers = st.session_state.db['debts'][sel]
+            msg = f"Paalala: Balance of ₱{pers['amount']:,.2f}."
+            st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+        with col_del:
+            if st.button(D["btn_paid"], type="primary"):
+                st.session_state.db['debts'].pop(sel); save_data(); st.rerun()
