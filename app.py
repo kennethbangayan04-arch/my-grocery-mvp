@@ -115,17 +115,44 @@ with tabs[3]:
     c2.metric(D["exp"], f"₱{exp:,.2f}")
     c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
 
-# TAB 5: UTANG
+# TAB 5: UTANG (Bilingual Automated Reminders)
 with tabs[4]:
     st.subheader(D["utang_header"])
-    u_n = st.text_input(D["cust"]); u_p = st.text_input(D["phone"]); u_a = st.number_input(D["debt_amt"])
+    
+    # 1. Entry Form
+    u_n = st.text_input(D["cust"])
+    u_p = st.text_input(D["phone"])
+    u_a = st.number_input(D["debt_amt"], min_value=0.0)
+    
     if st.button(f"➕ {D['utang_header']}"):
-        st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
-        save_data(); st.rerun()
+        if u_n and u_p:
+            st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+            save_data()
+            st.rerun()
+        else:
+            st.error("Please fill in the name and phone number.")
+
+    # 2. List and Reminder Logic
     if st.session_state.db['debts']:
         d_df = pd.DataFrame(st.session_state.db['debts'])
         st.table(d_df)
-        sel = st.selectbox(D["cust"], d_df['name'])
+        
+        st.markdown("---")
+        st.subheader(D["btn_sms"])
+        
+        # Select customer from the list
+        sel = st.selectbox(D["cust"], d_df['name'], key="remind_select")
         pers = next(i for i in st.session_state.db['debts'] if i['name'] == sel)
-        msg = f"Paalala sa utang: ₱{pers['amount']}"
-        st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+        
+        # --- AUTOMATED MESSAGE LOGIC ---
+        if lang == "Tagalog":
+            reminder_msg = f"Magandang araw {pers['name']}, paalala lang po mula sa tindahan tungkol sa utang na ₱{pers['amount']:,.2f}. Maraming salamat!"
+        else:
+            reminder_msg = f"Good day {pers['name']}, this is a friendly reminder from the store regarding the balance of ₱{pers['amount']:,.2f}. Thank you!"
+        
+        # Display a preview of the message
+        st.info(f"**Preview:** {reminder_msg}")
+        
+        # SMS Link Button
+        sms_url = f"sms:{pers['phone']}?body={urllib.parse.quote(reminder_msg)}"
+        st.link_button(D["btn_sms"], sms_url)
