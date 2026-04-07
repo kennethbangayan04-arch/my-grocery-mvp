@@ -134,7 +134,7 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# --- TAB 2: INVENTORY (With Row-by-Row Delete) ---
+# --- TAB 2: INVENTORY (With Delete/Management) ---
 with tabs[1]:
     st.subheader(D["inv_header"])
     
@@ -147,7 +147,7 @@ with tabs[1]:
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
             c_i = st.text_input("Code")
-            n_i = st.text_input(D["name"]).upper() # Auto-capitalize for professional look
+            n_i = st.text_input(D["name"])
             s_i = st.number_input(D["stock"], min_value=0)
             p_i = st.number_input(D["price"], min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
@@ -155,16 +155,7 @@ with tabs[1]:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
                     save_data()
                     st.rerun()
-            
-            # The Delete Button in the final column
-            if r6.button("🗑️", key=f"del_{code}"):
-                del st.session_state.db['inventory'][code]
-                save_data()
-                st.toast(f"Removed {details['name']}!") # Small feedback popup
-                st.rerun()
-    else:
-        st.info("No products registered yet.")
-        
+
     # 3. Current Inventory Display
     if st.session_state.db['inventory']:
         st.write("---")
@@ -195,6 +186,7 @@ with tabs[1]:
             st.rerun()
     else:
         st.info("No products registered yet.")
+        
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
     st.subheader(D["receipt_header"])
