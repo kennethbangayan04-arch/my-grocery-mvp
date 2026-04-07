@@ -12,15 +12,11 @@ def load_data():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f: 
-                data = json.load(f)
-                # Migration: Ensure existing items have all necessary keys
-                for k, v in data['inventory'].items():
-                    if "bought" not in v: v["bought"] = v.get("price", 0) * 0.8
-                return data
+                return json.load(f)
         except: 
             pass
     
-    # START WITH EMPTY DATA (No Lucky Me, No Rice)
+    # This is the "Clean Slate" template
     return {
         'sales': [], 
         'inventory': {}, 
