@@ -126,7 +126,7 @@ with tabs[4]:
     
     if st.button(f"➕ {D['utang_header']}"):
         if u_n and u_p:
-            st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+            st.session_state.db['debts'].append({"Name": u_n, "Phone Number": u_p, "Amount": u_a})
             save_data()
             st.rerun()
         else:
