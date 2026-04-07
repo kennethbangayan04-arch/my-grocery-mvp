@@ -123,22 +123,19 @@ with tabs[3]:
 
 # --- TAB 5: UTANG TRACKER ---
 with tabs[4]:
-    st.subheader(T[4]) # "Utang Tracker" or "Listahan ng Utang"
+    st.subheader(T[4])
     
-    # 1. Input Form for New Debt
+    # 1. Register New Debt
     with st.expander("➕ Register New Utang", expanded=True):
         u_col1, u_col2, u_col3 = st.columns(3)
         u_name = u_col1.text_input("Customer Name")
-        u_phone = u_col2.text_input("Mobile Number (e.g. 0917...)")
+        u_phone = u_col2.text_input("Mobile Number (e.g. 09171234567)")
         u_amt = u_col3.number_input("Amount Owed (₱)", min_value=0.0)
         
         if st.button("📝 Save Debt Record"):
             if u_name and u_phone:
                 st.session_state.db['debts'].append({
-                    "name": u_name, 
-                    "phone": u_phone, 
-                    "amount": u_amt, 
-                    "date": str(datetime.now().date())
+                    "name": u_name, "phone": u_phone, "amount": u_amt, "date": str(datetime.now().date())
                 })
                 save_data()
                 st.success(f"Recorded debt for {u_name}!")
@@ -146,30 +143,37 @@ with tabs[4]:
             else:
                 st.error("Please provide Name and Mobile Number.")
 
-    # 2. Display Table of Active Debts
+    # 2. Display Table
     if st.session_state.db['debts']:
         st.markdown("### Active Debts")
         debt_df = pd.DataFrame(st.session_state.db['debts'])
-        # Rename columns for the display table
-        debt_df.columns = ["Customer Name", "Mobile Number", "Amount (₱)", "Date Issued"]
         st.dataframe(debt_df, use_container_width=True)
         
         st.markdown("---")
         
-        # 3. Automated Reminder Logic
-        st.subheader("📲 Send SMS Reminder")
-        target = st.selectbox("Select Customer to Remind", [d['name'] for d in st.session_state.db['debts']])
+        # 3. SMS REMINDER BUTTON (The New Feature)
+        st.subheader("📲 Send Reminder")
+        selected_name = st.selectbox("Select Customer", [d['name'] for d in st.session_state.db['debts']])
         
-        # Find the specific data for the selected customer
-        customer_data = next(item for item in st.session_state.db['debts'] if item['name'] == target)
+        # Get data for selected person
+        person = next(item for item in st.session_state.db['debts'] if item['name'] == selected_name)
         
-        # Format the reminder message
-        msg = "Good day {}, paalala lang po sa inyong utang na ₱{:,.2f}. Salamat!".format(
-            customer_data['name'], 
-            customer_data['amount']
+        # Format the Message
+        reminder_msg = "Good day {}, paalala lang po sa inyong utang na ₱{:,.2f}. Salamat!".format(
+            person['name'], person['amount']
         )
         
-        st.code(msg, language="text")
-        st.caption("Copy the text above to send via SMS or Messenger.")
+        # Create the SMS Link (sms:number?body=message)
+        # Note: We use quote to handle spaces and symbols in the URL
+        import urllib.parse
+        encoded_msg = urllib.parse.quote(reminder_msg)
+        sms_link = f"sms:{person['phone']}?body={encoded_msg}"
+        
+        st.info(f"**Message Preview:** {reminder_msg}")
+        
+        # The Action Button
+        st.link_button(f"✉️ Send SMS to {person['name']}", sms_link)
+        
+        st.caption("Note: This button will open your phone's Messaging app with the text already typed out.")
     else:
         st.info("No credit records found.")
