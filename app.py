@@ -143,43 +143,58 @@ with tabs[1]:
         if v['stock'] <= v['min_alert']: 
             st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
     
-    # 2. Registration Form
+    # 2. Registration Form (Updated with BOUGHT and SRP)
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
             c_i = st.text_input("Barcode/Code")
             n_i = st.text_input(D["name"]).upper()
-            col_s, col_p = st.columns(2)
+            
+            # Three columns for the financial and stock inputs
+            col_s, col_b, col_p = st.columns(3)
             s_i = col_s.number_input("Initial Stock", min_value=0)
-            p_i = col_p.number_input("Price (SRP)", min_value=0.0)
+            b_i = col_b.number_input("Bought Price (Cost)", min_value=0.0) # Inlet Cost
+            p_i = col_p.number_input("SRP (Selling Price)", min_value=0.0) # Outlet Price
+            
             if st.form_submit_button(D["btn_reg"]):
                 if c_i and n_i:
-                    st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
+                    # Storing both BOUGHT and SRP in the database
+                    st.session_state.db['inventory'][c_i] = {
+                        "name": n_i, 
+                        "stock": s_i, 
+                        "bought": b_i, 
+                        "price": p_i, 
+                        "min_alert": 5
+                    }
                     save_data(); st.rerun()
 
-    # 3. Dynamic Inventory List (With Manual Restock)
+    # 3. Dynamic Inventory List (With Financial Columns)
     if st.session_state.db['inventory']:
         st.write("---")
-        # Layout: Code, Name, Stock, Price, Restock Input, Action
-        h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 2, 1])
+        # Layout Adjusted: Code, Name, Stock, Bought, SRP, Add Stock, Action
+        h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 2, 1, 1, 1, 1.5, 1])
         h1.write("**CODE**")
         h2.write("**NAME**")
         h3.write("**STOCK**")
-        h4.write("**PRICE**")
-        h5.write("**ADD STOCK**") # Header for typing
-        h6.write("**ACTION**")
+        h4.write("**BOUGHT**")
+        h5.write("**SRP**")
+        h6.write("**ADD STOCK**")
+        h7.write("**ACTION**")
         st.divider()
 
         for code, details in list(st.session_state.db['inventory'].items()):
-            r1, r2, r3, r4, r5, r6 = st.columns([1.5, 2.5, 1, 1, 2, 1])
+            r1, r2, r3, r4, r5, r6, r7 = st.columns([1.5, 2, 1, 1, 1, 1.5, 1])
             
             r1.write(f"`{code}`")
             r2.write(details['name'])
             r3.write(f"**{details['stock']}**")
-            r4.write(f"₱{details['price']:.2f}")
+            
+            # Displaying the money values
+            # Using .get() for 'bought' to prevent errors with old data
+            r4.write(f"₱{details.get('bought', 0.0):.2f}")
+            r5.write(f"₱{details['price']:.2f}")
             
             # --- MANUAL RESTOCK INPUT ---
-            # Using a small form for each row so the user can type and hit 'Enter'
-            with r5:
+            with r6:
                 with st.popover("➕ Add"):
                     add_amt = st.number_input("How many?", min_value=1, key=f"amt_{code}", step=1)
                     if st.button("Confirm", key=f"btn_{code}"):
@@ -189,12 +204,12 @@ with tabs[1]:
                         st.rerun()
             
             # --- DELETE FEATURE ---
-            if r6.button("🗑️", key=f"del_{code}"):
+            if r7.button("🗑️", key=f"del_{code}"):
                 del st.session_state.db['inventory'][code]
                 save_data()
                 st.rerun()
     else:
-        st.info("Inventory is empty.")        
+        st.info("Inventory is empty.")
 # TAB 3: RECEIPTS (Expense)
 with tabs[2]:
     st.subheader(D["receipt_header"])
