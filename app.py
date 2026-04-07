@@ -62,6 +62,21 @@ D = {
 st.title("🏪 Negosyo Pro")
 tabs = st.tabs(D["tabs"])
 
+# --- OWNER MANAGEMENT ---
+st.sidebar.write("---")
+st.sidebar.subheader("Owner Controls" if lang == "English" else "Control sa May-ari")
+
+if st.sidebar.button("🗑️ Reset for New Owner" if lang == "English" else "🗑️ Reset para sa Bagong Owner"):
+    # Clear the memory
+    st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+    
+    # Overwrite the file with empty data
+    if os.path.exists(DB_FILE):
+        os.remove(DB_FILE) 
+        
+    st.sidebar.success("System Reset!")
+    st.rerun()
+    
 # --- TAB 1: QUICK SALE ---
 with tabs[0]:
     st.subheader(D["sale_h"])
