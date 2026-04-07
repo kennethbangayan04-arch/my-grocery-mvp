@@ -10,8 +10,15 @@ DB_FILE = 'negosyo_pro_master.json'
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f: return json.load(f)
-        except: pass
+            with open(DB_FILE, 'r') as f: 
+                data = json.load(f)
+                # This line ensures 'cost' exists even in old data
+                for item in data['inventory'].values():
+                    if 'cost' not in item: item['cost'] = item.get('price', 0)
+                    if 'srp' not in item: item['srp'] = item.get('price', 0)
+                return data
+        except:
+            pass
     return {
         'sales': [], 
         'inventory': {
@@ -91,4 +98,31 @@ with tabs[2]:
         s_n = st.text_input("Store"); a_p = st.number_input("Amount")
         if st.form_submit_button("Save"):
             st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().date()), "store": s_n, "total": a_p})
-            save
+            save_data(); st.rerun()
+
+# --- TAB 4: REPORTS (True Profit) ---
+with tabs[3]:
+    st.subheader(D["rep_header"] if "rep_header" in D else "Summary")
+    sales_df = pd.DataFrame(st.session_state.db['sales'])
+    if not sales_df.empty:
+        total_rev = sales_df['srp'].sum()
+        # True Profit is SRP - Cost of items sold
+        true_profit = (sales_df['srp'] - sales_df['cost']).sum()
+        
+        c1, c2 = st.columns(2)
+        c1.metric(D["rev"], f"₱{total_rev:,.2f}")
+        c2.metric(D["prof"], f"₱{true_profit:,.2f}")
+        st.write("Recent Sales History:")
+        st.dataframe(sales_df)
+    else:
+        st.info("No sales data.")
+
+# --- TAB 5: UTANG ---
+with tabs[4]:
+    u_n = st.text_input("Name"); u_p = st.text_input("Phone"); u_a = st.number_input("Amt")
+    if st.button("Save"):
+        st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+        save_data(); st.rerun()
+    if st.session_state.db['debts']:
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        st.table(d_df)
