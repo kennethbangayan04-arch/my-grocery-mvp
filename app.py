@@ -5,7 +5,10 @@ import json
 import os
 import urllib.parse
 
-# --- 1. DATA ENGINE (Fixed Clean Slate) ---
+# --- TEMPORARY NUCLEAR RESET (Delete this after the app shows 0.00) ---
+st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+
+# --- 1. DATA ENGINE ---
 DB_FILE = 'negosyo_pro_master.json'
 
 def load_data():
@@ -17,7 +20,6 @@ def load_data():
         except: pass
     return {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
 
-# --- IMPORTANT: FORCING 0.00 FOR YOUR DEMO ---
 # To see 0.00, we ensure the session starts empty if no file exists
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
@@ -101,7 +103,7 @@ with tabs[0]:
             save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
         if c_clear.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# --- TAB 2: INVENTORY (With Bought Price & SRP) ---
+# --- TAB 2: INVENTORY  ---
 with tabs[1]:
     st.subheader(D["inv_h"])
     
@@ -119,7 +121,7 @@ with tabs[1]:
             # Create 3 columns: Stock, Bought Price, and SRP
             col_s, col_b, col_p = st.columns(3)
             s_i = col_s.number_input(D["stock"], min_value=0)
-            b_i = col_b.number_input(D["bought"], min_value=0.0) # <--- ADDED BOUGHT PRICE
+            b_i = col_b.number_input(D["bought"], min_value=0.0)
             p_i = col_p.number_input(D["srp"], min_value=0.0)
             
             if st.form_submit_button(D["btn_reg"]):
@@ -127,7 +129,7 @@ with tabs[1]:
                     st.session_state.db['inventory'][c_i] = {
                         "name": n_i, 
                         "stock": s_i, 
-                        "bought": b_i, # <--- SAVING BOUGHT PRICE
+                        "bought": b_i,
                         "price": p_i, 
                         "min_alert": 5
                     }
@@ -142,7 +144,7 @@ with tabs[1]:
         h1.write(f"**{D['code']}**")
         h2.write(f"**{D['name'].upper()}**")
         h3.write(f"**STOCK**")
-        h4.write(f"**BOUGHT**") # <--- NEW HEADER
+        h4.write(f"**BOUGHT**") 
         h5.write(f"**SRP**")
         h6.write(f"**{D['add_stock']}**")
         h7.write(f"**{D['action']}**")
@@ -156,7 +158,6 @@ with tabs[1]:
             r3.write(f"**{det['stock']}**")
             
             # Displaying the Money values
-            # .get() is used here so old items without a 'bought' price won't crash the app
             r4.write(f"₱{det.get('bought', 0.0):.2f}") 
             r5.write(f"₱{det['price']:.2f}")
             
@@ -174,7 +175,7 @@ with tabs[1]:
                 st.rerun()
     else:
         st.info("Inventory is empty.")
-# --- TAB 3: EXPENSES (With Monthly Filter) ---
+# --- TAB 3: ---
 with tabs[2]:
     st.subheader(D["rec_h"])
     
@@ -186,7 +187,6 @@ with tabs[2]:
         
         if st.form_submit_button(D["btn_save"]):
             if s_n and a_p > 0:
-                # We save the date as a string for the JSON file
                 st.session_state.db['purchase_receipts'].append({
                     "date": str(datetime.now().strftime("%Y-%m-%d")), 
                     "store": s_n.upper(), 
@@ -222,18 +222,16 @@ with tabs[2]:
         st.metric(f"{sel_exp_month} {D['exp']}", f"₱{monthly_total:,.2f}")
         
         # Display Table
-        # Cleaning up the view: removing the helper column before showing the user
         display_df = filtered_exp[['date', 'store', 'total']].copy()
         display_df.columns = ["DATE", "STORE", "AMOUNT"]
         st.dataframe(display_df, use_container_width=True)
         
     else:
         st.info("Walang nakatalang gasto." if lang == "Tagalog" else "No recorded expenses.")
-# --- TAB 4: REPORTS (Monthly Analysis - Fixed Calculation) ---
+# --- TAB 4: REPORTS  ---
 with tabs[3]:
     st.subheader(D["rep_h"])
     
-    # Initialize variables at zero (Steady State)
     rev, total_expenses, gross_markup, net_prof = 0.0, 0.0, 0.0, 0.0
     selected_month = datetime.now().strftime('%B %Y')
     
@@ -262,14 +260,14 @@ with tabs[3]:
         else:
             gross_markup = rev * 0.20 # Fallback estimate
             
-        # 3. OPERATING EXPENSES (From your Tab 3 entries)
+        # 3. OPERATING EXPENSES 
         p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
         if not p_df.empty:
             p_df['date'] = pd.to_datetime(p_df['date'])
             p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
             total_expenses = p_df[p_df['month_year'] == selected_month]['total'].sum()
 
-        # 4. NET PROFIT (The "Take Home" pay after all bills)
+        # 4. NET PROFIT 
         net_prof = gross_markup - total_expenses
 
     # --- DISPLAY METRICS ---
@@ -277,7 +275,6 @@ with tabs[3]:
     c1, c2, c3 = st.columns(3)
     c1.metric(D["rev"], f"₱{rev:,.2f}")
     c2.metric(D["exp"], f"₱{total_expenses:,.2f}")
-    # This now shows your actual Net Profit
     c3.metric(D["prof"], f"₱{net_prof:,.2f}")
     
     if rev > 0:
@@ -285,7 +282,8 @@ with tabs[3]:
         st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
         daily_sales = m_sales.groupby(m_sales['date'].dt.date)['total'].sum()
         st.line_chart(daily_sales)
-# --- TAB 5: UTANG (With Dynamic Column Fix) ---
+        
+# --- TAB 5: UTANG  ---
 with tabs[4]:
     st.subheader(D["ut_h"])
     with st.form("u_form", clear_on_submit=True):
@@ -298,17 +296,14 @@ with tabs[4]:
                     "name": u_n.upper(), 
                     "phone": u_p, 
                     "amount": u_a,
-                    "date": str(datetime.now().date()) # The 4th column
+                    "date": str(datetime.now().date()) 
                 })
                 save_data(); st.rerun()
 
-    # --- THIS IS WHERE YOU ADD THE FIX ---
     if st.session_state.db['debts']:
         st.write("---")
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
-        # --- DYNAMIC COLUMN FIX ---
-        # This prevents the "ValueError" if some rows are missing the Date
         if len(d_df.columns) == 4:
             d_df.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
         elif len(d_df.columns) == 3:
