@@ -150,15 +150,37 @@ with tabs[1]:
             if r6.button("🗑️", key=f"d_{code}"):
                 del st.session_state.db['inventory'][code]; save_data(); st.rerun()
 
-# --- TAB 3: EXPENSES ---
+# --- TAB 3: EXPENSES (With Photo Upload) ---
 with tabs[2]:
     st.subheader(D["rec_h"])
-    with st.form("p_form"):
-        s_n = st.text_input(D["store"]); a_p = st.number_input(D["amt"])
+    with st.form("p_form", clear_on_submit=True):
+        s_n = st.text_input(D["store"])
+        a_p = st.number_input(D["amt"], min_value=0.0)
+        
+        # --- NEW UPLOAD BUTTON ---
+        u_p = st.file_uploader(D["photo"] if "photo" in D else "Upload Photo", type=['jpg', 'png', 'jpeg'])
+        
         if st.form_submit_button(D["btn_save"]):
-            st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().date()), "store": s_n, "total": a_p})
-            save_data(); st.rerun()
-    st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']), use_container_width=True)
+            if s_n and a_p > 0:
+                expense_entry = {
+                    "date": str(datetime.now().date()), 
+                    "store": s_n.upper(), 
+                    "total": a_p,
+                    "has_photo": True if u_p is not None else False
+                }
+                st.session_state.db['purchase_receipts'].append(expense_entry)
+                save_data()
+                st.success("Saved!" if lang == "English" else "Naitabi na!")
+                st.rerun()
+            else:
+                st.error("Please enter Store and Amount" if lang == "English" else "Ilagay ang Tindahan at Halaga")
+
+    if st.session_state.db['purchase_receipts']:
+        st.write("---")
+        exp_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        # Rename columns for professional look
+        exp_df.columns = [c.upper() for c in exp_df.columns]
+        st.dataframe(exp_df, use_container_width=True)
 
 # --- TAB 4: REPORTS (Monthly Analysis) ---
 with tabs[3]:
