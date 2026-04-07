@@ -78,23 +78,51 @@ with tabs[1]:
                 st.rerun()
     st.dataframe(pd.DataFrame.from_dict(st.session_state.db['inventory'], orient='index'), use_container_width=True)
 
-# --- TAB 3: PURCHASE RECEIPTS ---
+# --- TAB 3: PURCHASE RECEIPTS (Expense & Photo Archive) ---
 with tabs[2]:
-    st.subheader(T[2])
-    with st.form("p_form"):
-        store = st.text_input("Store Name")
-        cost = st.number_input("Amount Paid (Expense)", min_value=0.0)
-        if st.form_submit_button("Archive Receipt"):
-            st.session_state.db['purchase_receipts'].append({
-                "date": str(datetime.now().date()), 
-                "store": store, 
-                "total": cost
-            })
-            save_data()
-            st.success("Expense Recorded!")
-            st.rerun()
+    st.subheader(T[2]) # "Purchase Receipts" or "Resibo ng Binili"
+    st.info("Snap a photo of your grocery/wholesaler receipt to track your business expenses.")
+    
+    # 1. Upload Form
+    with st.form("purchase_form", clear_on_submit=True):
+        col_a, col_b = st.columns(2)
+        store_name = col_a.text_input("Store Name (e.g. Puregold, Market)")
+        total_spent = col_b.number_input("Total Amount Spent (₱)", min_value=0.0)
+        
+        # This creates the "Browse" or "Take Photo" button
+        uploaded_file = st.file_uploader("📸 Upload Receipt Photo", type=['png', 'jpg', 'jpeg'])
+        
+        notes = st.text_area("Items Bought (e.g. 1 sack Rice, 5 cases Noodles)")
+        
+        submit_receipt = st.form_submit_button("💾 Save to Digital Archive")
+        
+        if submit_receipt:
+            if store_name and total_spent > 0:
+                # Store the data
+                receipt_entry = {
+                    "date": str(datetime.now().strftime("%Y-%m-%d")),
+                    "store": store_name,
+                    "amount": total_spent,
+                    "items": notes,
+                    "photo_id": uploaded_file.name if uploaded_file else "No Photo"
+                }
+                st.session_state.db['purchase_receipts'].append(receipt_entry)
+                save_data()
+                st.success(f"Receipt from {store_name} archived successfully!")
+                st.rerun()
+            else:
+                st.error("Please enter the Store Name and Amount.")
+
+    # 2. Display the History Table
+    st.markdown("---")
+    st.subheader("📜 Expense History")
     if st.session_state.db['purchase_receipts']:
-        st.dataframe(pd.DataFrame(st.session_state.db['purchase_receipts']), use_container_width=True)
+        expense_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        # Rename for cleaner display
+        expense_df.columns = ["Date", "Store", "Amount (₱)", "Details", "Receipt File"]
+        st.dataframe(expense_df, use_container_width=True)
+    else:
+        st.info("No receipts archived yet.")
 
 # --- TAB 4: FINANCIAL REPORTS ---
 with tabs[3]:
