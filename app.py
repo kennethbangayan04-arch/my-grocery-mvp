@@ -182,48 +182,55 @@ with tabs[2]:
         exp_df.columns = [c.upper() for c in exp_df.columns]
         st.dataframe(exp_df, use_container_width=True)
 
-# --- TAB 4: REPORTS (Monthly Analysis) ---
+# --- TAB 4: REPORTS (Monthly Analysis - Clean Start) ---
 with tabs[3]:
     st.subheader(D["rep_h"])
     
+    # Initialize default values
+    rev, monthly_exp, prof = 0.0, 0.0, 0.0
+    selected_month = datetime.now().strftime('%B %Y')
+    
     if st.session_state.db['sales']:
         s_df = pd.DataFrame(st.session_state.db['sales'])
-        
-        # 1. Convert 'date' string to actual datetime objects for filtering
         s_df['date'] = pd.to_datetime(s_df['date'])
-        
-        # 2. MONTH SELECTOR UI
-        # We extract unique months/years from your sales history
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
-        available_months = s_df['month_year'].unique()
         
+        available_months = s_df['month_year'].unique()
         selected_month = st.selectbox(
             "Piliin ang Buwan" if lang == "Tagalog" else "Select Month", 
-            options=available_months
+            options=available_months,
+            index=len(available_months)-1 # Default to latest month
         )
         
-        # 3. FILTER DATA based on selection
+        # Filter for the selected month
         monthly_data = s_df[s_df['month_year'] == selected_month]
-        
-        # 4. CALCULATE METRICS
-        # Revenue from filtered sales
         rev = monthly_data['total'].sum()
         
-        # Expenses (We filter expenses too if they have dates)
+        # Profit Calculation (Uses the data saved from Tab 1)
+        if 'srp' in monthly_data.columns and 'bought' in monthly_data.columns:
+            prof = (monthly_data['srp'] - monthly_data['bought']).sum()
+        else:
+            prof = rev * 0.20 # Fallback estimate
+            
+        # Expenses filter
         p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
         if not p_df.empty:
             p_df['date'] = pd.to_datetime(p_df['date'])
             p_df['month_year'] = p_df['date'].dt.strftime('%B %Y')
             monthly_exp = p_df[p_df['month_year'] == selected_month]['total'].sum()
-        else:
-            monthly_exp = 0
 
-        # Profit Calculation
-        # Safety Check: Use actual profit if columns exist, otherwise estimate 20%
-        if 'srp' in monthly_data.columns and 'bought' in monthly_data.columns:
-            prof = (monthly_data['srp'] - monthly_data['bought']).sum()
-        else:
-            prof = rev * 0.20 
+    # --- DISPLAY METRICS (Will show 0.00 if no data) ---
+    st.info(f"📅 {selected_month}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric(D["rev"], f"₱{rev:,.2f}")
+    c2.metric(D["exp"], f"₱{monthly_exp:,.2f}")
+    c3.metric(D["prof"], f"₱{prof:,.2f}")
+    
+    if rev > 0:
+        st.write("---")
+        st.subheader("Daily Sales Trend" if lang == "English" else "Daloy ng Benta")
+        daily_sales = monthly_data.groupby(monthly_data['date'].dt.date)['total'].sum()
+        st.line_chart(daily_sales)
 
         # 5. DISPLAY METRICS
         st.info(f"📅 {selected_month}")
