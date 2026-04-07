@@ -155,30 +155,6 @@ with tabs[1]:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
                     save_data()
                     st.rerun()
-
-    # 3. Dynamic Inventory Table with Delete Column
-    if st.session_state.db['inventory']:
-        st.write("---")
-        # Define Column Widths: Code (2), Name (3), Stock (1), Price (1), Alert (1), Action (1)
-        h1, h2, h3, h4, h5, h6 = st.columns([2, 3, 1, 1, 1, 1])
-        h1.write("**CODE**")
-        h2.write("**NAME**")
-        h3.write("**STOCK**")
-        h4.write("**PRICE**")
-        h5.write("**ALERT**")
-        h6.write("**ACTION**")
-        st.divider()
-
-        # Loop through inventory to create rows
-        # We use list() so we can delete items without breaking the loop
-        for code, details in list(st.session_state.db['inventory'].items()):
-            r1, r2, r3, r4, r5, r6 = st.columns([2, 3, 1, 1, 1, 1])
-            
-            r1.write(f"`{code}`")
-            r2.write(details['name'])
-            r3.write(str(details['stock']))
-            r4.write(f"₱{details['price']:.2f}")
-            r5.write(str(details['min_alert']))
             
             # The Delete Button in the final column
             if r6.button("🗑️", key=f"del_{code}"):
