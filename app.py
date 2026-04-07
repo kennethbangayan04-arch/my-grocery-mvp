@@ -134,7 +134,7 @@ with tabs[0]:
             st.session_state.cart = []
             st.rerun()
 
-# --- TAB 2: INVENTORY (With Delete/Management) ---
+# --- TAB 2: INVENTORY (With Row-by-Row Delete) ---
 with tabs[1]:
     st.subheader(D["inv_header"])
     
@@ -147,14 +147,45 @@ with tabs[1]:
     with st.expander(D["btn_reg"]):
         with st.form("add_form", clear_on_submit=True):
             c_i = st.text_input("Code")
-            n_i = st.text_input(D["name"])
-            s_i = st.number_input(D["stock"], min_value=0)
-            p_i = st.number_input(D["price"], min_value=0.0)
+            n_i = st.text_input(D["name"]).upper()
+            col_s, col_p = st.columns(2)
+            s_i = col_s.number_input(D["stock"], min_value=0)
+            p_i = col_p.number_input(D["price"], min_value=0.0)
             if st.form_submit_button(D["btn_reg"]):
                 if c_i and n_i:
                     st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "price": p_i, "min_alert": 5}
-                    save_data()
-                    st.rerun()
+                    save_data(); st.rerun()
+
+    # 3. Interactive Inventory List (Custom Row Layout)
+    if st.session_state.db['inventory']:
+        st.write("---")
+        # Header Row
+        h1, h2, h3, h4, h5 = st.columns([2, 3, 1, 1, 1])
+        h1.write("**CODE**")
+        h2.write("**NAME**")
+        h3.write("**STOCK**")
+        h4.write("**PRICE**")
+        h5.write("**ACTION**")
+        st.divider()
+
+        # Data Rows
+        # We loop through the dictionary to create a row for every product
+        for code, details in list(st.session_state.db['inventory'].items()):
+            r1, r2, r3, r4, r5 = st.columns([2, 3, 1, 1, 1])
+            
+            r1.write(f"`{code}`")
+            r2.write(details['name'])
+            r3.write(str(details['stock']))
+            r4.write(f"₱{details['price']:.2f}")
+            
+            # The Delete Button on the far right
+            if r5.button("🗑️", key=f"del_{code}"):
+                del st.session_state.db['inventory'][code]
+                save_data()
+                st.toast(f"Removed {details['name']}!") # Small notification
+                st.rerun()
+    else:
+        st.info("No products registered yet.")
 
     # 3. Current Inventory Display
     if st.session_state.db['inventory']:
