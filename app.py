@@ -115,17 +115,52 @@ with tabs[3]:
     c2.metric(D["exp"], f"₱{exp:,.2f}")
     c3.metric(D["prof"], f"₱{rev-exp:,.2f}")
 
-# TAB 5: UTANG
+# TAB 5: UTANG (With Delete/Paid Function)
 with tabs[4]:
     st.subheader(D["utang_header"])
-    u_n = st.text_input(D["cust"]); u_p = st.text_input(D["phone"]); u_a = st.number_input(D["debt_amt"])
-    if st.button(f"➕ {D['utang_header']}"):
-        st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
-        save_data(); st.rerun()
+    
+    # 1. Entry Form
+    with st.form("utang_form", clear_on_submit=True):
+        u_n = st.text_input(D["cust"])
+        u_p = st.text_input(D["phone"])
+        u_a = st.number_input(D["debt_amt"], min_value=0.0)
+        if st.form_submit_button(f"➕ {D['utang_header']}"):
+            if u_n and u_p:
+                st.session_state.db['debts'].append({"name": u_n, "phone": u_p, "amount": u_a})
+                save_data()
+                st.rerun()
+
+    # 2. List and Actions
     if st.session_state.db['debts']:
+        st.markdown("---")
+        
+        # Display as a nice table first
         d_df = pd.DataFrame(st.session_state.db['debts'])
         st.table(d_df)
-        sel = st.selectbox(D["cust"], d_df['name'])
-        pers = next(i for i in st.session_state.db['debts'] if i['name'] == sel)
-        msg = f"Paalala sa utang: ₱{pers['amount']}"
-        st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+        
+        # --- DELETE / PAID SECTION ---
+        st.write("---")
+        col_remind, col_delete = st.columns(2)
+        
+        with col_remind:
+            st.subheader(D["btn_sms"])
+            sel_idx = st.selectbox("Select Customer", range(len(st.session_state.db['debts'])), 
+                                   format_func=lambda x: st.session_state.db['debts'][x]['name'])
+            
+            pers = st.session_state.db['debts'][sel_idx]
+            
+            # Bilingual Message
+            msg = f"Paalala mula sa tindahan: May utang po na ₱{pers['amount']:,.2f}. Salamat!" if lang == "Tagalog" else f"Reminder from the store: Balance of ₱{pers['amount']:,.2f}. Thank you!"
+            
+            st.link_button(D["btn_sms"], f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+
+        with col_delete:
+            st.subheader("Action")
+            # The "Delete" button
+            delete_label = "✅ Mark as Paid / Delete" if lang == "English" else "✅ Bayad na / Burahin"
+            if st.button(delete_label, type="primary"):
+                # Remove the selected person using their index
+                removed_person = st.session_state.db['debts'].pop(sel_idx)
+                save_data()
+                st.success(f"Removed {removed_person['name']} from list.")
+                st.rerun()
