@@ -67,17 +67,72 @@ D = {
 st.title(f"🏪 Negosyo Pro")
 tabs = st.tabs(D["tabs"])
 
-# TAB 1: QUICK SALE
+# --- TAB 1: QUICK SALE (With Multi-Item Cart) ---
 with tabs[0]:
     st.subheader(D["sale_header"])
-    b_in = st.text_input(D["input_code"], key="sale_in")
+    
+    # Initialize an empty cart in the session if it doesn't exist
+    if 'cart' not in st.session_state:
+        st.session_state.cart = []
+
+    col_input, col_qty = st.columns([3, 1])
+    b_in = col_input.text_input(D["input_code"], key="sale_in")
+    q_in = col_qty.number_input("Qty", min_value=1, value=1)
+    
     if b_in in st.session_state.db['inventory']:
         item = st.session_state.db['inventory'][b_in]
-        st.info(f"**{item['name']}** | ₱{item['price']}")
-        if st.button(D["btn_sell"]):
-            st.session_state.db['inventory'][b_in]['stock'] -= 1
-            st.session_state.db['sales'].append({"date": str(datetime.now().date()), "item": item['name'], "total": item['price']})
-            save_data(); st.rerun()
+        st.info(f"✨ **{item['name']}** | ₱{item['price']} | Stock: {item['stock']}")
+        
+        if st.button("➕ Add to Cart" if lang == "English" else "➕ Idagdag sa Cart"):
+            if item['stock'] >= q_in:
+                # Add to temporary cart
+                st.session_state.cart.append({
+                    "code": b_in,
+                    "name": item['name'],
+                    "qty": q_in,
+                    "price": item['price'],
+                    "subtotal": item['price'] * q_in
+                })
+                st.success(f"Added {q_in}x {item['name']}")
+            else:
+                st.error("Insufficient Stock!")
+
+    # --- DISPLAY CART ---
+    if st.session_state.cart:
+        st.write("---")
+        st.markdown("### 🛒 Current Cart / Mga Bibilhin")
+        cart_df = pd.DataFrame(st.session_state.cart)
+        # Capitalize headers for the cart as well
+        cart_df.columns = ["CODE", "ITEM", "QTY", "PRICE", "SUBTOTAL"]
+        st.table(cart_df)
+        
+        total_bill = cart_df['SUBTOTAL'].sum()
+        st.header(f"TOTAL: ₱{total_bill:,.2f}")
+        
+        c_pay, c_clear = st.columns(2)
+        
+        # FINAL CHECKOUT BUTTON
+        if c_pay.button("🏁 " + D["btn_sell"], type="primary", use_container_width=True):
+            for entry in st.session_state.cart:
+                # 1. Deduct from inventory
+                st.session_state.db['inventory'][entry['code']]['stock'] -= entry['qty']
+                # 2. Record in Sales History
+                st.session_state.db['sales'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d %H:%M")),
+                    "item": entry['name'],
+                    "total": entry['subtotal']
+                })
+            
+            # Save data and clear cart
+            save_data()
+            st.session_state.cart = []
+            st.balloons()
+            st.success("Transaction Complete!")
+            st.rerun()
+
+        if c_clear.button("🗑️ Clear Cart", use_container_width=True):
+            st.session_state.cart = []
+            st.rerun()
 
 # TAB 2: INVENTORY
 with tabs[1]:
