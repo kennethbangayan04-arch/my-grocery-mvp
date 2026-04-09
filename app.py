@@ -243,57 +243,44 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (Standardized Formatting) ---
+# --- TAB 5: UTANG (With 7-Day Hard Limit) ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
     
+    # 1. ADD DEBT FORM
     with st.form("u_form", clear_on_submit=True):
         un = st.text_input("NAME").upper()
         up = st.text_input("PHONE")
         ua = st.number_input("AMOUNT", min_value=0.0)
+        
+        # --- THE 7-DAY LIMIT LOGIC ---
+        today = datetime.now().date()
+        max_due_date = today + pd.Timedelta(days=7) # Hard limit of 7 days
+        
+        # We set min_value and max_value to lock the calendar
+        ud = st.date_input(
+            "DUE DATE (Max 7 Days)", 
+            value=max_due_date,
+            min_value=today,
+            max_value=max_due_date
+        )
+        
         if st.form_submit_button("ADD DEBT"):
-            existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
-            if existing + ua > CREDIT_LIMIT:
-                st.error(f"Limit Reached! Current Debt: ₱{existing:,.2f}")
-            else:
-                st.session_state.db['debts'].append({
-                    "name": un, 
-                    "phone": up, 
-                    "amount": ua, 
-                    "date": str(datetime.now().date())
-                })
-                save_data(); st.success("Debt Added Successfully"); st.rerun()
-
-    if st.session_state.db['debts']:
-        st.write("---")
-        # 1. Prepare Data
-        d_df = pd.DataFrame(st.session_state.db['debts'])
-        
-        # 2. Rename and Capitalize Headers (Using QUANTITY as requested)
-        # Note: If your debt rows have a 'qty', we rename it here. 
-        # Most debts just use 'amount', so we ensure 'AMOUNT' is formatted.
-        d_df.columns = [col.upper() for col in d_df.columns]
-        
-        # 3. Enforce 2 Decimal Places for the AMOUNT column
-        formatted_debts = d_df.style.format({
-            "AMOUNT": "₱{:,.2f}"
-        })
-        
-        # 4. Display the Table
-        st.table(formatted_debts)
-        
-        st.write("---")
-        # Action Section
-        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
-                           format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
-        pers = st.session_state.db['debts'][idx]
-        
-        col_sms, col_pay = st.columns(2)
-        with col_sms:
-            msg = f"Good day {pers['name']}! Reminder of your balance at Bentamate: ₱{pers['amount']:,.2f}."
-            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
-        
-        with col_pay:
-            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
-                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+            if un and up and ua > 0:
+                # Calculate existing debt for this person
+                existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
+                
+                if existing + ua > CREDIT_LIMIT:
+                    st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
+                else:
+                    st.session_state.db['debts'].append({
+                        "name": un, 
+                        "phone": up, 
+                        "amount": ua, 
+                        "date": str(today),
+                        "due_date": str(ud)
+                    })
+                    save_data()
+                    st.success(f"✅ Registered! Due on {ud.strftime('%b %d')}")
+                    st.rerun()
