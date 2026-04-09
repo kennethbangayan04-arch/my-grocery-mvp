@@ -64,22 +64,16 @@ st.sidebar.title("🏪 Bentamate")
 st.sidebar.caption("Smart Business Companion")
 st.sidebar.write("---")
 
-# Owner Controls
-if st.sidebar.button(
-    "🗑️ Reset for New Owner" if lang == "English" else "🗑️ Reset para sa Bagong Owner",
-    key="reset_button"
-):
+if st.sidebar.button("🗑️ Reset for New Owner", key="reset_button"):
     st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): 
-        os.remove(DB_FILE)
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
     st.rerun()
 
-# --- MAIN PAGE HEADER ---
 st.title("🏪 Bentamate")
 st.markdown("##### Smart Business Companion")
-st.write("") # Tiny spacer for a clean look
+st.write("")
 
-# --- TOP DASHBOARD ---
+# --- TOP DASHBOARD CALCULATIONS ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
 p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
 today_str = datetime.now().strftime("%Y-%m-%d")
@@ -87,22 +81,10 @@ today_str = datetime.now().strftime("%Y-%m-%d")
 today_sales = s_df[s_df['date'].str.contains(today_str)]['total'].sum() if not s_df.empty else 0
 total_products = len(st.session_state.db['inventory'])
 total_expenses = p_df['total'].sum() if not p_df.empty else 0
-low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= 5)
-
-# --- TOP DASHBOARD LOGIC ---
-# We define 'low' as 5 units or less (Safety Buffer)
 low_stock_threshold = 5 
 low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= low_stock_threshold)
 
-# Display in the 4th card (Teal)
-with c4:
-    st.markdown(f'''
-        <div class="metric-card" style="border-left-color: #e0f2f1;">
-            <div class="metric-title">📉 {D["low"]}</div>
-            <div class="metric-value">{low_stock_count}</div>
-        </div>
-    ''', unsafe_allow_html=True)
-
+# --- TOP DASHBOARD DISPLAY (FIXED ORDER) ---
 c1, c2, c3, c4 = st.columns(4)
 with c1: st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;"><div class="metric-title">{D["rev"]}</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;"><div class="metric-title">{D["inv"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
@@ -111,7 +93,6 @@ with c4: st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f
 
 st.write("---")
 
-# --- NAVIGATION TABS ---
 t1, t2, t3, t4, t5 = st.tabs(D["tabs"])
 
 # --- TAB 1: QUICK SALE ---
@@ -145,103 +126,79 @@ with t1:
             save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
         if cc.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# --- TAB 2: INVENTORY (With Notifications) ---
+# --- TAB 2: INVENTORY ---
 with t2:
     st.markdown("### 📦 Stock Management")
-    
-    # Global Notification Area
     if low_stock_count > 0:
         st.error(f"🚨 **{D['low_stock']}** {low_stock_count} items need restocking!")
+    
+    with st.expander("Register New Product"):
+        with st.form("reg_form", clear_on_submit=True):
+            c_i = st.text_input("Code")
+            n_i = st.text_input("Name").upper()
+            cs, cb, cp = st.columns(3)
+            s_i = cs.number_input("Stock", min_value=0)
+            b_i = cb.number_input("Bought Price", min_value=0.0)
+            p_i = cp.number_input("SRP", min_value=0.0)
+            if st.form_submit_button("Save"):
+                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "bought": b_i, "price": p_i, "min_alert": 5}
+                save_data(); st.rerun()
 
     if st.session_state.db['inventory']:
         st.write("---")
         h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
         h1.write("**CODE**"); h2.write("**NAME**"); h3.write("**STOCK**"); h4.write("**SRP**"); h5.write("**ADD**"); h6.write("**DEL**")
-        
         for code, det in list(st.session_state.db['inventory'].items()):
             r1, r2, r3, r4, r5, r6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
-            
-            r1.write(f"`{code}`")
-            r2.write(det['name'])
-            
-            # --- HIGHLIGHT LOW STOCK ---
+            r1.write(f"`{code}`"); r2.write(det['name'])
             if det['stock'] <= low_stock_threshold:
-                r3.write(f"🔴 **{det['stock']}**") # Red and Bold for danger
+                r3.write(f"🔴 **{det['stock']}**")
             else:
                 r3.write(f"🟢 {det['stock']}")
-            
             r4.write(f"₱{det['price']:.2f}")
-            
             with r5:
                 with st.popover("➕"):
-                    amt = st.number_input("Qty", min_value=1, key=f"add_stock_{code}")
-                    if st.button("Save", key=f"btn_stock_{code}"):
+                    amt = st.number_input("Qty", min_value=1, key=f"add_{code}")
+                    if st.button("Save", key=f"btn_{code}"):
                         st.session_state.db['inventory'][code]['stock'] += amt
                         save_data(); st.rerun()
-            
-            if r6.button("🗑️", key=f"del_item_{code}"):
-                del st.session_state.db['inventory'][code]; save_data(); st.rerun()# --- TAB 3: EXPENSES (With Receipt Upload) ---
+            if r6.button("🗑️", key=f"del_{code}"):
+                del st.session_state.db['inventory'][code]; save_data(); st.rerun()
+
+# --- TAB 3: EXPENSES ---
 with t3:
     st.markdown(f"### {D['exp']}")
-    
     with st.form("exp_form", clear_on_submit=True):
         store = st.text_input("Store Name")
         amt = st.number_input("Amount", min_value=0.0)
-        
-        # --- NEW UPLOAD BUTTON ---
         uploaded_file = st.file_uploader("Upload Receipt (Optional)", type=['jpg', 'png', 'jpeg'])
-        
         if st.form_submit_button("Log Expense"):
             if store and amt > 0:
-                receipt_name = "No Receipt"
-                
-                # Check if a file was actually uploaded
-                if uploaded_file is not None:
-                    receipt_name = uploaded_file.name
-                    # In a real app, you would save the file to a folder here
-                    # For a demo, we just record that it exists
-                
-                st.session_state.db['purchase_receipts'].append({
-                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
-                    "store": store.upper(), 
-                    "total": amt,
-                    "receipt": receipt_name # Save the file name to the DB
-                })
-                save_data()
-                st.success("Expense Recorded!")
-                st.rerun()
+                receipt_name = uploaded_file.name if uploaded_file else "No Receipt"
+                st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().strftime("%Y-%m-%d")), "store": store.upper(), "total": amt, "receipt": receipt_name})
+                save_data(); st.success("Expense Recorded!"); st.rerun()
 
-    # --- DISPLAY TABLE (Updated to show Receipt Status) ---
     if st.session_state.db['purchase_receipts']:
         st.write("---")
         df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
         df_p['date'] = pd.to_datetime(df_p['date'])
         df_p['month_year'] = df_p['date'].dt.strftime('%B %Y')
-        
         sel_month = st.selectbox("Filter Month", df_p['month_year'].unique(), key="exp_month_filter")
-        
-        filtered_df = df_p[df_p['month_year'] == sel_month].copy()
-        
-        # Rename columns for a professional look in the table
-        display_df = filtered_df[['date', 'store', 'total', 'receipt']].copy()
-        display_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT FILE"]
-        
-        st.table(display_df)
+        f_df = df_p[df_p['month_year'] == sel_month][['date', 'store', 'total', 'receipt']].copy()
+        f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
+        st.table(f_df)
+
 # --- TAB 4: REPORTS ---
 with t4:
     st.markdown("### Financial Analysis")
     if not s_df.empty:
         s_df['date'] = pd.to_datetime(s_df['date'])
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
-        sel_m = st.selectbox("Select Report Month", s_df['month_year'].unique())
-        m_sales = s_df[s_df['month_year'] == sel_m]
+        sel_m = st.selectbox("Select Report Month", s_df['month_year'].unique(), key="rep_month_sel")
+        m_sales = s_df[s_df['month_year'] == sel_m].copy()
         rev = m_sales['total'].sum()
         markup = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
-        m_exp = pd.DataFrame(st.session_state.db['purchase_receipts'])
-        exp_total = 0
-        if not m_exp.empty:
-            m_exp['date'] = pd.to_datetime(m_exp['date'])
-            exp_total = m_exp[m_exp['date'].dt.strftime('%B %Y') == sel_m]['total'].sum()
+        exp_total = p_df[pd.to_datetime(p_df['date']).dt.strftime('%B %Y') == sel_m]['total'].sum() if not p_df.empty else 0
         
         st.metric("Net Profit", f"₱{markup - exp_total:,.2f}")
         st.write("---")
@@ -259,9 +216,9 @@ with t5:
             save_data(); st.rerun()
     if st.session_state.db['debts']:
         st.table(pd.DataFrame(st.session_state.db['debts']))
-        idx = st.selectbox("Select Debtor", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'], key="sms_sel")
+        idx = st.selectbox("Select Debtor", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'], key="active_debtor")
         pers = st.session_state.db['debts'][idx]
-        msg = f"Good day {pers['name']}! Friendly reminder of your balance: ₱{pers['amount']:,.2f}."
-        st.link_button("Send SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
-        if st.button("Mark as Paid", type="primary"):
+        msg = f"Good day {pers['name']}! Reminder of your balance at Bentamate: ₱{pers['amount']:,.2f}."
+        st.link_button("Send SMS Reminder", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+        if st.button("Mark as Paid", type="primary", key="debt_paid_btn"):
             st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
