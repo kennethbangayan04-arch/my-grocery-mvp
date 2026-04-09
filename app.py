@@ -40,8 +40,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
-
 D = {
     "English": {
         "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
@@ -59,28 +57,14 @@ D = {
     }
 }[lang]
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Clean & Optimized Layout) ---
 st.sidebar.title("🏪 Bentamate")
-st.sidebar.caption("Smart Business Companion")
+st.sidebar.markdown("##### Smart Business Companion")
 st.sidebar.write("---")
 
-if st.sidebar.button("🗑️ Reset for New Owner", key="reset_button"):
-    st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
-    st.rerun()
-
-st.title("🏪 Bentamate")
-st.markdown("##### Smart Business Companion")
-st.write("")
-
-# --- SIDEBAR (Branded & Auth) ---
-st.sidebar.title("🏪 Bentamate")
-st.sidebar.caption("Smart Business Companion")
-
-# --- MOCK LOGIN SECTION ---
+# 1. Account Access Section
 with st.sidebar.popover("👤 Account Access", use_container_width=True):
     auth_mode = st.radio("Choose Action", ["Sign In", "Create Account"])
-    
     if auth_mode == "Sign In":
         st.text_input("Email or Username", placeholder="juan@email.com")
         st.text_input("Password", type="password")
@@ -94,8 +78,21 @@ with st.sidebar.popover("👤 Account Access", use_container_width=True):
         if st.button("Register", use_container_width=True):
             st.toast("Account created (Demo Mode)!", icon="🎉")
 
-st.sidebar.write("---")
+# 2. Language Selection
+lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
+# 3. Vertical Spacing (This pushes the next items to the bottom)
+for _ in range(15):
+    st.sidebar.write("")
+
+# 4. Reset Button at the very bottom
+st.sidebar.write("---")
+if st.sidebar.button("🗑️ Reset for New Owner", key="reset_button", use_container_width=True):
+    st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+    if os.path.exists(DB_FILE): 
+        os.remove(DB_FILE)
+    st.rerun()
+    
 # --- TOP DASHBOARD CALCULATIONS ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
 p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
