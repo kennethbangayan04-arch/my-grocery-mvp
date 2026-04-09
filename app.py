@@ -306,17 +306,16 @@ with t5:
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
-        # Calculate days for SMS message
-        p_due = pd.to_datetime(pers['due_date'])
-        p_days = (p_due - now_dt).days
-        
-        col_sms, col_pay = st.columns(2)
-        with col_sms:
-            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
-            if p_days <= 3:
-                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
-            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
-        
-        with col_pay:
-            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
-                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+       # --- THE FIX: Convert to clean Integer ---
+p_due = pd.to_datetime(pers['due_date'])
+# We use .days to get the integer count of days
+p_days = int((p_due - now_dt).days) 
+
+col_sms, col_pay = st.columns(2)
+with col_sms:
+    # Now p_days is a clean whole number (e.g., 3 instead of 3.0 or 3 days 00:00:00)
+    msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
+    if p_days <= 3:
+        msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
+    
+    st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
