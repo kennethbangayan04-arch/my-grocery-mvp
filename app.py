@@ -93,7 +93,7 @@ with c4: st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f
 
 # --- 🚨 CRITICAL LOW STOCK NOTIFICATION (STAYS ON TOP) ---
 if low_stock_count > 0:
-    st.error(f"⚠️ **{D['low_stock']}** {low_stock_count} items are below the safety limit! Check the Inventory tab to restock.")
+    st.error(f"**{D['low_stock']}** {low_stock_count} items are below the safety limit! Check the Inventory tab to restock.")
 
 st.write("---")
 
