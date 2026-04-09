@@ -240,87 +240,81 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (Final Robust Version) ---
+# --- TAB 5: UTANG (Final Corrected & Performance Optimized) ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
-    today_date = datetime.now().date()
-    # Hard limit of 7 days for the date picker
-    max_due = today_date + pd.Timedelta(days=7)
+    today_dt_obj = datetime.now().date()
+    max_due = today_dt_obj + pd.Timedelta(days=7)
     
     with st.form("u_form", clear_on_submit=True):
         un = st.text_input("NAME").upper()
         up = st.text_input("PHONE")
         ua = st.number_input("AMOUNT", min_value=0.0)
-        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_date, max_value=max_due)
+        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_dt_obj, max_value=max_due)
         
         if st.form_submit_button("ADD DEBT"):
             if un and up and ua > 0:
-                # Calculate existing debt for this person
                 existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
-                
                 if existing + ua > CREDIT_LIMIT:
                     st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
                 else:
                     st.session_state.db['debts'].append({
                         "name": un, "phone": up, "amount": ua, 
-                        "date": str(today_date), "due_date": str(ud)
+                        "date": str(today_dt_obj), "due_date": str(ud)
                     })
                     save_data(); st.success("Debt Added Successfully"); st.rerun()
 
     if st.session_state.db['debts']:
         st.write("---")
-        # 1. Prepare Data into a DataFrame
+        # 1. Prepare Data
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
-        # 2. VECTORIZED DATE CALCULATION (Fixes the crash)
-        # Convert strings to datetime objects
-        d_df['DUE_DATE_DT'] = pd.to_datetime(d_df['due_date'])
-        # Create a matching today_dt object
-        today_dt = pd.to_datetime(datetime.now().date())
-        # Calculate days left using the .dt accessor
-        d_df['DAYS_LEFT'] = (d_df['DUE_DATE_DT'] - today_dt).dt.days
+        # 2. Vectorized Date Calculation (The fix for the previous error)
+        d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
+        now_dt = pd.to_datetime(datetime.now().date())
+        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
         
-        # 3. SELECT AND CAPITALIZE COLUMNS FOR DISPLAY
-        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date']].copy()
-        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE"]
+        # 3. Create Display Version (We keep DAYS_LEFT hidden from the table but available for the logic)
+        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
+        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
-        # 4. CONDITIONAL HIGHLIGHTING LOGIC
-        def highlight_due(row):
-            # Recalculate days for the style function
-            debt_dt = pd.to_datetime(row['DUE DATE']).date()
-            days = (debt_dt - today_date).days
+        # 4. REFACTORED STYLING FUNCTION (Uses the pre-calculated DAYS_LEFT)
+        def apply_row_styles(row):
+            days = row['DAYS_LEFT']
             if days < 0:
-                return ['background-color: #ffcdd2'] * len(row) # Red for Overdue
+                return ['background-color: #ffcdd2'] * len(row) # Red (Overdue)
             if days <= 3:
-                return ['background-color: #fff9c4'] * len(row) # Yellow for Warning
+                return ['background-color: #fff9c4'] * len(row) # Yellow (Near)
             return [''] * len(row)
 
-        # 5. RENDER FORMATTED TABLE
-        st.table(display_debt.style.apply(highlight_due, axis=1).format({"AMOUNT": "₱{:,.2f}"}))
+        # 5. RENDER (Hide the DAYS_LEFT column from the user)
+        # We use .hide_columns to keep the data visible to the logic but invisible to the UI
+        st.table(
+            display_debt.style.apply(apply_row_styles, axis=1)
+            .format({"AMOUNT": "₱{:,.2f}"})
+            .hide(axis="columns", subset=["DAYS_LEFT"]) 
+        )
         
-        # 6. URGENT NOTIFICATION BAR
+        # 6. Notifications
         upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
         if not upcoming.empty:
-            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) have payments due within 3 days!")
+            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
         st.write("---")
-        # 7. ACTION SELECTOR
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
-        # Calculate days for the SMS message
-        msg_days_left = (pd.to_datetime(pers['due_date']).date() - today_date).days
+        # Calculate days for SMS message
+        p_due = pd.to_datetime(pers['due_date'])
+        p_days = (p_due - now_dt).days
         
         col_sms, col_pay = st.columns(2)
         with col_sms:
-            # Context-Aware SMS Messaging
-            if msg_days_left <= 3:
-                msg = f"URGENT: {pers['name']}, your balance of ₱{pers['amount']:,.2f} at Bentamate is due in {msg_days_left} days ({pers['due_date']})."
-            else:
-                msg = f"Good day {pers['name']}! Reminder of your balance at Bentamate: ₱{pers['amount']:,.2f} due on {pers['due_date']}."
-            
+            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
+            if p_days <= 3:
+                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
             st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
         
         with col_pay:
