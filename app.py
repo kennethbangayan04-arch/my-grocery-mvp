@@ -225,19 +225,58 @@ with t4:
         m_sales['day'] = m_sales['date'].dt.date
         st.line_chart(m_sales.groupby('day')['total'].sum())
 
-# --- TAB 5: UTANG ---
+# --- TAB 5: UTANG (With ₱500 Credit Limit) ---
 with t5:
     st.markdown("### Debt Registry")
+    
+    # Define the Set Point (Limit)
+    CREDIT_LIMIT = 500.0
+    
     with st.form("u_form", clear_on_submit=True):
-        un, up, ua = st.text_input("Name"), st.text_input("Phone"), st.number_input("Amount", min_value=0.0)
+        un = st.text_input("Name").upper()
+        up = st.text_input("Phone")
+        ua = st.number_input("Amount", min_value=0.0)
+        
         if st.form_submit_button("Add Debt"):
-            st.session_state.db['debts'].append({"name": un.upper(), "phone": up, "amount": ua, "date": str(datetime.now().date())})
-            save_data(); st.rerun()
+            if un and up and ua > 0:
+                # 1. Calculate existing debt for this specific person
+                existing_debt = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
+                new_total = existing_debt + ua
+                
+                # 2. THE SAFETY INTERLOCK (The Logic Gate)
+                if new_total > CREDIT_LIMIT:
+                    st.error(f"❌ **LIMIT REACHED!** {un} already has ₱{existing_debt:,.2f} in debt. Adding ₱{ua:,.2f} would exceed the ₱{CREDIT_LIMIT:,.2f} limit.")
+                else:
+                    # Register only if within limit
+                    st.session_state.db['debts'].append({
+                        "name": un, 
+                        "phone": up, 
+                        "amount": ua, 
+                        "date": str(datetime.now().date())
+                    })
+                    save_data()
+                    st.success(f"✅ Debt registered for {un}. Total balance: ₱{new_total:,.2f}")
+                    st.rerun()
+
+    # --- LIST AND ACTIONS ---
     if st.session_state.db['debts']:
-        st.table(pd.DataFrame(st.session_state.db['debts']))
-        idx = st.selectbox("Select Debtor", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'], key="active_debtor")
+        st.write("---")
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        st.table(d_df)
+        
+        # Debtor Selector for SMS/Payment
+        idx = st.selectbox("Select Customer", range(len(st.session_state.db['debts'])), 
+                           format_func=lambda x: st.session_state.db['debts'][x]['name'], key="sms_sel")
         pers = st.session_state.db['debts'][idx]
-        msg = f"Good day {pers['name']}! Reminder of your balance at Bentamate: ₱{pers['amount']:,.2f}."
-        st.link_button("Send SMS Reminder", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
-        if st.button("Mark as Paid", type="primary", key="debt_paid_btn"):
-            st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+        
+        col_sms, col_pay = st.columns(2)
+        with col_sms:
+            msg = f"Good day {pers['name']}! Friendly reminder of your balance: ₱{pers['amount']:,.2f}."
+            st.link_button("Send SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
+        
+        with col_pay:
+            if st.button("Mark as Paid", type="primary", use_container_width=True, key="pay_btn"):
+                st.session_state.db['debts'].pop(idx)
+                save_data()
+                st.success("Record Updated!")
+                st.rerun()
