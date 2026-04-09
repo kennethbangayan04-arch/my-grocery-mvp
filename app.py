@@ -115,13 +115,28 @@ with t1:
                 st.rerun()
             else: st.error("Out of stock!")
 
-    if st.session_state.cart:
+  if st.session_state.cart:
         st.write("---")
+        # 1. Prepare the data for display
         cart_df = pd.DataFrame(st.session_state.cart)
-        st.table(cart_df[['name', 'qty', 'price', 'subtotal']])
+        
+        # 2. Select and Capitalize the columns
+        display_cart = cart_df[['name', 'qty', 'price', 'subtotal']].copy()
+        display_cart.columns = ["NAME", "QTY", "PRICE", "SUBTOTAL"] # CAPS labels
+        
+        # 3. Format to exactly 2 decimal places
+        # This converts numbers to strings for a clean look in the table
+        formatted_cart = display_cart.style.format({
+            "PRICE": "₱{:,.2f}",
+            "SUBTOTAL": "₱{:,.2f}"
+        })
+        
+        # 4. Show the Table
+        st.table(formatted_cart)
+        
+        # Total Calculation
         total_bill = cart_df['subtotal'].sum()
         st.header(f"{D['total']}: ₱{total_bill:,.2f}")
-        cp, cc = st.columns(2)
         
         if cp.button(D["btn_sell"], type="primary", use_container_width=True):
             # Batch ID for grouping
