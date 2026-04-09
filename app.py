@@ -46,7 +46,7 @@ D = {
     "English": {
         "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
         "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
-        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Qty", "total": "TOTAL",
+        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL",
         "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart", "low_stock": "⚠️ LOW STOCK!",
         "action": "Actions", "add_stock": "Add Stock", "btn_paid": "Mark as Paid", "btn_sms": "Send SMS Reminder"
     },
@@ -118,10 +118,8 @@ with t1:
     if st.session_state.cart:
         st.write("---")
         cart_df = pd.DataFrame(st.session_state.cart)
-        
-        # Capitalize and Format
         display_cart = cart_df[['name', 'qty', 'price', 'subtotal']].copy()
-        display_cart.columns = ["NAME", "QTY", "PRICE", "SUBTOTAL"]
+        display_cart.columns = ["NAME", "QUANTITY", "PRICE", "SUBTOTAL"] 
         formatted_cart = display_cart.style.format({"PRICE": "₱{:,.2f}", "SUBTOTAL": "₱{:,.2f}"})
         
         st.table(formatted_cart)
@@ -172,7 +170,7 @@ with t2:
                 r4.write(f"₱{det['price']:.2f}")
                 with r5:
                     with st.popover("➕"):
-                        amt = st.number_input("Qty", min_value=1, key=f"add_inv_{code}")
+                        amt = st.number_input("Quantity", min_value=1, key=f"add_inv_{code}")
                         if st.button("Save", key=f"btn_inv_{code}"):
                             st.session_state.db['inventory'][code]['stock'] += amt
                             save_data(); st.rerun()
@@ -229,7 +227,6 @@ with t4:
         day_logs = m_sales[m_sales['just_date'] == sel_day].copy()
         if not day_logs.empty:
             if 'trans_id' not in day_logs.columns: day_logs['trans_id'] = "Legacy"
-            
             receipts = day_logs.groupby('trans_id').agg({'date': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'}).sort_values(by='date', ascending=False)
             receipts['TIME'] = receipts['date'].dt.strftime('%I:%M %p')
             log_display = receipts[['TIME', 'item', 'total']]
@@ -243,44 +240,68 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (With 7-Day Hard Limit) ---
+# --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
+    today_date = datetime.now().date()
+    max_due = today_date + pd.Timedelta(days=7)
     
-    # 1. ADD DEBT FORM
     with st.form("u_form", clear_on_submit=True):
         un = st.text_input("NAME").upper()
         up = st.text_input("PHONE")
         ua = st.number_input("AMOUNT", min_value=0.0)
-        
-        # --- THE 7-DAY LIMIT LOGIC ---
-        today = datetime.now().date()
-        max_due_date = today + pd.Timedelta(days=7) # Hard limit of 7 days
-        
-        # We set min_value and max_value to lock the calendar
-        ud = st.date_input(
-            "DUE DATE (Max 7 Days)", 
-            value=max_due_date,
-            min_value=today,
-            max_value=max_due_date
-        )
+        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_date, max_value=max_due)
         
         if st.form_submit_button("ADD DEBT"):
-            if un and up and ua > 0:
-                # Calculate existing debt for this person
-                existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
-                
-                if existing + ua > CREDIT_LIMIT:
-                    st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
-                else:
-                    st.session_state.db['debts'].append({
-                        "name": un, 
-                        "phone": up, 
-                        "amount": ua, 
-                        "date": str(today),
-                        "due_date": str(ud)
-                    })
-                    save_data()
-                    st.success(f"✅ Registered! Due on {ud.strftime('%b %d')}")
-                    st.rerun()
+            existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
+            if existing + ua > CREDIT_LIMIT:
+                st.error(f"Limit Reached! Current Debt: ₱{existing:,.2f}")
+            else:
+                st.session_state.db['debts'].append({
+                    "name": un, "phone": up, "amount": ua, 
+                    "date": str(today_date), "due_date": str(ud)
+                })
+                save_data(); st.success("Debt Added Successfully"); st.rerun()
+
+    if st.session_state.db['debts']:
+        st.write("---")
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        
+        # Calculate Days Left for Reminders
+        d_df['DUE_DATE_DT'] = pd.to_datetime(d_df['due_date']).dt.date
+        d_df['DAYS_LEFT'] = (d_df['DUE_DATE_DT'] - today_date).apply(lambda x: x.days)
+        
+        # Formatting Table
+        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date']].copy()
+        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE"]
+        
+        def highlight_due(row):
+            # 3-day reminder (Yellow) or Overdue (Red)
+            debt_dt = pd.to_datetime(row['DUE DATE']).date()
+            days = (debt_dt - today_date).days
+            if days < 0: return ['background-color: #ffcdd2'] * len(row)
+            if days <= 3: return ['background-color: #fff9c4'] * len(row)
+            return [''] * len(row)
+
+        st.table(display_debt.style.apply(highlight_due, axis=1).format({"AMOUNT": "₱{:,.2f}"}))
+        
+        # 3-Day Reminder Alert
+        upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
+        if not upcoming.empty:
+            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) have payments due within 3 days!")
+
+        st.write("---")
+        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
+        pers = st.session_state.db['debts'][idx]
+        
+        days_left = (pd.to_datetime(pers['due_date']).date() - today_date).days
+        col_sms, col_pay = st.columns(2)
+        with col_sms:
+            msg = f"Good day {pers['name']}! Reminder: Balance ₱{pers['amount']:,.2f} due on {pers['due_date']}."
+            if days_left <= 3: msg = f"URGENT: {pers['name']}, your balance ₱{pers['amount']:,.2f} is due in {days_left} days!"
+            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
+        
+        with col_pay:
+            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
+                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
