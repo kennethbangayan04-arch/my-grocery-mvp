@@ -240,7 +240,7 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (Final Corrected & Performance Optimized) ---
+# --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
@@ -267,53 +267,40 @@ with t5:
 
     if st.session_state.db['debts']:
         st.write("---")
-        # 1. Prepare Data
         d_df = pd.DataFrame(st.session_state.db['debts'])
-        
-        # 2. Vectorized Date Calculation (The fix for the previous error)
         d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
         now_dt = pd.to_datetime(datetime.now().date())
         d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
         
-        # 3. Create Display Version (We keep DAYS_LEFT hidden from the table but available for the logic)
         display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
         display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
-        # 4. REFACTORED STYLING FUNCTION (Uses the pre-calculated DAYS_LEFT)
         def apply_row_styles(row):
             days = row['DAYS_LEFT']
-            if days < 0:
-                return ['background-color: #ffcdd2'] * len(row) # Red (Overdue)
-            if days <= 3:
-                return ['background-color: #fff9c4'] * len(row) # Yellow (Near)
+            if days < 0: return ['background-color: #ffcdd2'] * len(row)
+            if days <= 3: return ['background-color: #fff9c4'] * len(row)
             return [''] * len(row)
 
-        # 5. RENDER (Hide the DAYS_LEFT column from the user)
-        # We use .hide_columns to keep the data visible to the logic but invisible to the UI
         st.table(
             display_debt.style.apply(apply_row_styles, axis=1)
             .format({"AMOUNT": "₱{:,.2f}"})
             .hide(axis="columns", subset=["DAYS_LEFT"]) 
         )
         
-        # 6. Notifications
         upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
         if not upcoming.empty:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
-st.write("---")
+        st.write("---")
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
-        # --- THE FIX: Correct Indentation & Integer Conversion ---
         p_due = pd.to_datetime(pers['due_date'])
-        # now_dt was defined above as pd.to_datetime(datetime.now().date())
         p_days = int((p_due - now_dt).days) 
 
         col_sms, col_pay = st.columns(2)
         with col_sms:
-            # Now p_days is a clean whole number (e.g., 3 instead of 3.0)
             msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
             if p_days <= 3:
                 msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
@@ -323,6 +310,3 @@ st.write("---")
         with col_pay:
             if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
                 st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
-        msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
-    
-    st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
