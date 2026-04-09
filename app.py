@@ -75,79 +75,79 @@ if st.sidebar.button("🗑️ Reset for New Owner" if lang == "English" else "�
     st.sidebar.success("System Reset!")
     st.rerun()
    
-# --- 3. MODERN UI CSS (Ensure this is in your code) ---
+# --- 3. MODERN UI CSS (Clean & Non-Redundant) ---
 st.markdown("""
     <style>
-    [data-testid="stHeader"] {background: rgba(0,0,0,0);}
+    /* Clean up top padding */
+    .block-container { padding-top: 1rem; }
+    
+    /* Modern Metric Cards Styling */
     .metric-card {
         background-color: white; padding: 20px; border-radius: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-left: 5px solid #FFC0CB;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03); border-left: 6px solid #FFC0CB;
+        margin-bottom: 10px;
     }
-    .metric-title { font-size: 13px; color: #757575; font-weight: bold; text-transform: uppercase; }
-    .metric-value { font-size: 22px; font-weight: bold; color: #212121; margin-top: 5px; }
-    /* This hides the redundant spacing at the top of tabs */
-    .block-container { padding-top: 2rem; }
+    .metric-title { font-size: 12px; color: #888; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+    .metric-value { font-size: 26px; font-weight: bold; color: #2c3e50; margin-top: 5px; }
+    
+    /* Remove redundant tab headers padding */
+    [data-testid="stExpander"] { border: none; box-shadow: none; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- DASHBOARD METRICS (The 4 Colored Boxes) ---
+# --- DASHBOARD LOGIC (Live Calculation) ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
 p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
 today_str = datetime.now().strftime("%Y-%m-%d")
 
 today_sales = s_df[s_df['date'].str.contains(today_str)]['total'].sum() if not s_df.empty else 0
 total_products = len(st.session_state.db['inventory'])
-weekly_expenses = p_df['total'].sum() if not p_df.empty else 0
+total_exp = p_df['total'].sum() if not p_df.empty else 0
 low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= v['min_alert'])
 
+# --- DISPLAY TOP DASHBOARD ---
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;"><div class="metric-title">🛒 {D["rev"]} Today</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card" style="border-left-color: #ff8a80;"><div class="metric-title">🛒 {D["rev"]} Today</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
 with c2:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;"><div class="metric-title">📦 {D["inv_h"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card" style="border-left-color: #82b1ff;"><div class="metric-title">📦 {D["inv_h"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #fff3e0;"><div class="metric-title">🧾 {D["exp"]} This Week</div><div class="metric-value">₱{weekly_expenses:,.2f}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card" style="border-left-color: #ffd180;"><div class="metric-title">🧾 {D["exp"]} Total</div><div class="metric-value">₱{total_exp:,.2f}</div></div>', unsafe_allow_html=True)
 with c4:
-    st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f1;"><div class="metric-title">📉 {D["low_stock"]}</div><div class="metric-value">{low_stock_count}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="metric-card" style="border-left-color: #b2dfdb;"><div class="metric-title">📉 {D["low_stock"]}</div><div class="metric-value">{low_stock_count}</div></div>', unsafe_allow_html=True)
 
 st.write("---")
 
-# --- NAVIGATION TABS ---
-# We use emojis in the tab names to match the photo's icons
+# --- 4. NAVIGATION TABS (The ONLY Place headers appear) ---
 t1, t2, t3, t4, t5 = st.tabs(["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"])
 
 # --- TAB 1: QUICK SALE ---
 with t1:
-    st.markdown("### Register a Sale")
+    # Notice: NO st.subheader here. Just the action.
+    st.markdown("### Register a Sale") 
     col_in, col_qty = st.columns([3, 1])
+    # Placeholder acts as the label to save space
+    b_in = col_in.text_input(D["input_c"], placeholder="Scan/Type Barcode", key="main_barcode_in", label_visibility="collapsed")
+    q_in = col_qty.number_input(D["qty"], min_value=1, value=1, key="main_qty_in", label_visibility="collapsed")
     
-    # Ensure this key="sale_in" is NOT used anywhere else in your script
-    b_in = col_in.text_input(
-        D["input_c"], 
-        placeholder="Scan/Type Barcode", 
-        key="sale_barcode_input", # Changed key to be more unique
-        label_visibility="collapsed"
-    )
-    
-    q_in = col_qty.number_input(
-        D["qty"], 
-        min_value=1, 
-        value=1, 
-        key="sale_qty_input", # Added a unique key here too
-        label_visibility="collapsed"
-    )
+    # ... (Rest of Sale logic: Add to Cart, Checkout, etc.)
 
-# --- TAB 2: INVENTORY (Redundancy Removed) ---
+# --- TAB 2: INVENTORY ---
 with t2:
-    # Subheader removed, directly to alerts or registration
+    # No Header. Directly to Alerts and Stock Management.
     for k, v in st.session_state.db['inventory'].items():
         if v['stock'] <= v['min_alert']: 
-            st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+            st.warning(f"⚠️ {D['low_stock']} {v['name']} ({v['stock']})")
     
-    # Rest of Inventory logic...# --- 4. NAVIGATION BAR (The Tabbed View) ---
-# Replace your current st.tabs line with this:
-tabs = st.tabs([f"🎴 {t}" for t in D["tabs"]])
-# --- TAB 1: QUICK SALE ---
+    # ... (Rest of Inventory logic)
+
+# --- TAB 3: EXPENSES ---
+with t3:
+    # No Header. Directly to the Expense Form.
+    with st.form("p_form_modern", clear_on_submit=True):
+        # ... (Rest of Expense logic)
+    
+        # --- TAB 1: QUICK SALE ---
 with tabs[0]:
     st.subheader(D["sale_h"])
     if 'cart' not in st.session_state: st.session_state.cart = []
