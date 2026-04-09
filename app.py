@@ -63,6 +63,19 @@ st.sidebar.write("---")
 # 2. Language Selection
 lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
+# 3. Translation Dictionary
+D = {
+    "English": {
+        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
+        "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
+        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL"
+    },
+    "Tagalog": {
+        "tabs": ["⚡ Benta", "📦 Imbentaryo", "🧾 Gasto", "📊 Ulat", "💳 Utang"],
+        "rev": "Benta Ngayon", "inv": "Produkto", "exp": "Kabuuang Gasto", "low": "Konti na lang",
+        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "total": "KABUUAN"
+    }
+}[lang]
 
 # --- CALCULATIONS ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
@@ -162,11 +175,11 @@ with t4:
         gross_sales = m_sales['total'].sum()
         earnings = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
         
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Gross Sales", f"₱{gross_sales:,.2f}")
-        c2.metric("Gross Earnings", f"₱{earnings:,.2f}")
-        c3.metric("Expenses", f"₱{m_exp:,.2f}")
-        c4.metric("Net Profit", f"₱{earnings - m_exp:,.2f}")
+        rc1, rc2, rc3, rc4 = st.columns(4)
+        rc1.metric("Gross Sales", f"₱{gross_sales:,.2f}")
+        rc2.metric("Gross Earnings", f"₱{earnings:,.2f}")
+        rc3.metric("Expenses", f"₱{m_exp:,.2f}")
+        rc4.metric("Net Profit", f"₱{earnings - m_exp:,.2f}")
 
         st.write("---")
         st.subheader("📝 Daily Transaction Log")
