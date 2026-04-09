@@ -111,7 +111,11 @@ with t1:
         st.info(f"✨ **{item['name']}** | ₱{item['price']:.2f} | Stock: {item['stock']}")
         if st.button("➕ Add to Cart", use_container_width=True, key="add_to_cart"):
             if item['stock'] >= q_in:
-                st.session_state.cart.append({"code": b_in, "name": item['name'], "qty": q_in, "bought": item.get('bought', 0), "price": item['price'], "subtotal": item['price'] * q_in})
+                st.session_state.cart.append({
+                    "code": b_in, "name": item['name'], "qty": q_in, 
+                    "bought": item.get('bought', 0), "price": item['price'], 
+                    "subtotal": item['price'] * q_in
+                })
                 st.rerun()
             else: st.error("Out of stock!")
 
@@ -187,7 +191,10 @@ with t3:
         if st.form_submit_button("Log Expense"):
             if store and amt > 0:
                 receipt_name = uploaded_file.name if uploaded_file else "No Receipt"
-                st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().strftime("%Y-%m-%d")), "store": store.upper(), "total": amt, "receipt": receipt_name})
+                st.session_state.db['purchase_receipts'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
+                    "store": store.upper(), "total": amt, "receipt": receipt_name
+                })
                 save_data(); st.success("Expense Recorded!"); st.rerun()
 
     if st.session_state.db['purchase_receipts']:
@@ -227,7 +234,10 @@ with t4:
         day_logs = m_sales[m_sales['just_date'] == sel_day].copy()
         if not day_logs.empty:
             if 'trans_id' not in day_logs.columns: day_logs['trans_id'] = "Legacy"
-            receipts = day_logs.groupby('trans_id').agg({'date': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'}).sort_values(by='date', ascending=False)
+            receipts = day_logs.groupby('trans_id').agg({
+                'date': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'
+            }).sort_values(by='date', ascending=False)
+            
             receipts['TIME'] = receipts['date'].dt.strftime('%I:%M %p')
             log_display = receipts[['TIME', 'item', 'total']]
             log_display.columns = ["TIME", "ITEMS BOUGHT", "RECEIPT TOTAL"]
@@ -240,7 +250,7 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (Final Corrected & Performance Optimized) ---
+# --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
@@ -267,39 +277,34 @@ with t5:
 
     if st.session_state.db['debts']:
         st.write("---")
-        # 1. Prepare Data
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
-        # 2. Vectorized Date Calculation
+        # Date Logic
         d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
         now_dt = pd.to_datetime(datetime.now().date())
         d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
         
-        # 3. Create Display Version
         display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
         display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
-        # 4. Styling Function
         def apply_row_styles(row):
             days = row['DAYS_LEFT']
-            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red (Overdue)
-            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow (Near)
+            if days < 0: return ['background-color: #ffcdd2'] * len(row)
+            if days <= 3: return ['background-color: #fff9c4'] * len(row)
             return [''] * len(row)
 
-        # 5. Render Table
         st.table(
             display_debt.style.apply(apply_row_styles, axis=1)
             .format({"AMOUNT": "₱{:,.2f}"})
             .hide(axis="columns", subset=["DAYS_LEFT"]) 
         )
         
-        # 6. Notifications
         upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
         if not upcoming.empty:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
         st.write("---")
-        # --- FIXED INDENTATION ON THIS BLOCK ---
+        # FIXED INDENTATION BELOW
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
