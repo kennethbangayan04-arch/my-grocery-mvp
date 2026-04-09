@@ -55,7 +55,7 @@ D = {
         "btn_sell": "🏁 Tapusin ang Benta", "btn_clear": "🗑️ Burahin ang Cart", "low_stock": "⚠️ KONTI NA LANG!",
         "action": "Aksyon", "add_stock": "Dagdag Stock", "btn_paid": "Bayad na", "btn_sms": "Mag-SMS Paalala"
     }
-}[lang]
+
 
 # --- SIDEBAR (Clean & Optimized Layout) ---
 st.sidebar.title("🏪 Bentamate")
