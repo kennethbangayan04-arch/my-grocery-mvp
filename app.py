@@ -243,57 +243,27 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG (Standardized Formatting) ---
+# --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
-    
     with st.form("u_form", clear_on_submit=True):
-        un = st.text_input("NAME").upper()
-        up = st.text_input("PHONE")
-        ua = st.number_input("AMOUNT", min_value=0.0)
-        if st.form_submit_button("ADD DEBT"):
+        un = st.text_input("Name").upper()
+        up = st.text_input("Phone")
+        ua = st.number_input("Amount", min_value=0.0)
+        if st.form_submit_button("Add Debt"):
             existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
             if existing + ua > CREDIT_LIMIT:
-                st.error(f"Limit Reached! Current Debt: ₱{existing:,.2f}")
+                st.error(f"Limit Reached! Current: ₱{existing}")
             else:
-                st.session_state.db['debts'].append({
-                    "name": un, 
-                    "phone": up, 
-                    "amount": ua, 
-                    "date": str(datetime.now().date())
-                })
-                save_data(); st.success("Debt Added Successfully"); st.rerun()
+                st.session_state.db['debts'].append({"name": un, "phone": up, "amount": ua, "date": str(datetime.now().date())})
+                save_data(); st.success("Debt Added"); st.rerun()
 
     if st.session_state.db['debts']:
-        st.write("---")
-        # 1. Prepare Data
-        d_df = pd.DataFrame(st.session_state.db['debts'])
-        
-        # 2. Rename and Capitalize Headers (Using QUANTITY as requested)
-        # Note: If your debt rows have a 'qty', we rename it here. 
-        # Most debts just use 'amount', so we ensure 'AMOUNT' is formatted.
-        d_df.columns = [col.upper() for col in d_df.columns]
-        
-        # 3. Enforce 2 Decimal Places for the AMOUNT column
-        formatted_debts = d_df.style.format({
-            "AMOUNT": "₱{:,.2f}"
-        })
-        
-        # 4. Display the Table
-        st.table(formatted_debts)
-        
-        st.write("---")
-        # Action Section
-        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
-                           format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
+        st.table(pd.DataFrame(st.session_state.db['debts']))
+        idx = st.selectbox("Select Debtor", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'])
         pers = st.session_state.db['debts'][idx]
-        
-        col_sms, col_pay = st.columns(2)
-        with col_sms:
-            msg = f"Good day {pers['name']}! Reminder of your balance at Bentamate: ₱{pers['amount']:,.2f}."
-            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
-        
-        with col_pay:
-            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
-                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+        msg = f"Reminder of your balance at Bentamate: ₱{pers['amount']:.2f}."
+        st.link_button("Send SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
+        if st.button("Mark Paid", type="primary"):
+            st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
