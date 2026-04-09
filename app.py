@@ -40,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR (Clean & Optimized) ---
+# --- SIDEBAR (Clean & Secured) ---
 st.sidebar.title("🏪 Bentamate")
 
 # 1. Account Access at the Top
@@ -63,32 +63,6 @@ st.sidebar.write("---")
 # 2. Language Selection
 lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
-D = {
-    "English": {
-        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
-        "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
-        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL"
-    },
-    "Tagalog": {
-        "tabs": ["⚡ Benta", "📦 Imbentaryo", "🧾 Gasto", "📊 Ulat", "💳 Utang"],
-        "rev": "Benta Ngayon", "inv": "Produkto", "exp": "Kabuuang Gasto", "low": "Konti na lang",
-        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "total": "KABUUAN"
-    }
-}[lang]
-
-# Spacing to push reset to bottom
-for _ in range(10): st.sidebar.write("")
-
-# 3. Danger Zone / Reset at the Bottom
-st.sidebar.write("---")
-with st.sidebar.expander("⚠️ Danger Zone"):
-    if st.sidebar.button("🗑️ Reset for New Owner", use_container_width=True, key="reset_button"):
-        st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-        if os.path.exists(DB_FILE): os.remove(DB_FILE)
-        st.rerun()
-
-st.title("🏪 Bentamate")
-st.write("")
 
 # --- CALCULATIONS ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
