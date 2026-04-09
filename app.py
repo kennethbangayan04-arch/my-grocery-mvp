@@ -177,7 +177,7 @@ with t2:
                 if r6.button("🗑️", key=f"del_inv_{code}"):
                     del st.session_state.db['inventory'][code]; save_data(); st.rerun()
 
-# --- TAB 3: EXPENSES ---
+# --- TAB 3: EXPENSES (Formatted) ---
 with t3:
     st.markdown(f"### {D['exp']}")
     with st.form("exp_form", clear_on_submit=True):
@@ -187,17 +187,34 @@ with t3:
         if st.form_submit_button("Log Expense"):
             if store and amt > 0:
                 receipt_name = uploaded_file.name if uploaded_file else "No Receipt"
-                st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().strftime("%Y-%m-%d")), "store": store.upper(), "total": amt, "receipt": receipt_name})
+                st.session_state.db['purchase_receipts'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
+                    "store": store.upper(), 
+                    "total": amt, 
+                    "receipt": receipt_name
+                })
                 save_data(); st.success("Expense Recorded!"); st.rerun()
 
     if st.session_state.db['purchase_receipts']:
+        st.write("---")
         df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
-        df_p['date'] = pd.to_datetime(df_p['date'])
-        df_p['month_year'] = df_p['date'].dt.strftime('%B %Y')
-        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique())
+        
+        # 1. Filter Logic
+        df_p['date_dt'] = pd.to_datetime(df_p['date'])
+        df_p['month_year'] = df_p['date_dt'].dt.strftime('%B %Y')
+        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique(), key="exp_month_filter")
+        
+        # 2. Select and Capitalize Columns
         f_df = df_p[df_p['month_year'] == sel_month][['date', 'store', 'total', 'receipt']].copy()
         f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
-        st.table(f_df)
+        
+        # 3. Format Amount to 2 Decimals
+        formatted_expenses = f_df.style.format({
+            "AMOUNT": "₱{:,.2f}"
+        })
+        
+        # 4. Show the Table
+        st.table(formatted_expenses)
 
 # --- TAB 4: REPORTS ---
 with t4:
