@@ -59,13 +59,25 @@ D = {
     }
 }[lang]
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Branded) ---
 st.sidebar.title("🏪 Bentamate")
 st.sidebar.caption("Smart Business Companion")
-if st.sidebar.button("🗑️ Reset for New Owner", key="owner_reset"):
+st.sidebar.write("---")
+
+# Owner Controls
+if st.sidebar.button(
+    "🗑️ Reset for New Owner" if lang == "English" else "🗑️ Reset para sa Bagong Owner",
+    key="reset_button"
+):
     st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    if os.path.exists(DB_FILE): 
+        os.remove(DB_FILE)
     st.rerun()
+
+# --- MAIN PAGE HEADER ---
+st.title("🏪 Bentamate")
+st.markdown("##### Smart Business Companion")
+st.write("") # Tiny spacer for a clean look
 
 # --- TOP DASHBOARD ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
