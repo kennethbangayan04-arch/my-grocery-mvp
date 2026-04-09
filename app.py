@@ -177,16 +177,27 @@ with t2:
                 if r6.button("🗑️", key=f"del_inv_{code}"):
                     del st.session_state.db['inventory'][code]; save_data(); st.rerun()
 
-# --- TAB 3: EXPENSES (Formatted) ---
+# --- TAB 3: EXPENSES (With File Viewing) ---
 with t3:
     st.markdown(f"### {D['exp']}")
     with st.form("exp_form", clear_on_submit=True):
         store = st.text_input("Store Name")
         amt = st.number_input("Amount", min_value=0.0)
-        uploaded_file = st.file_uploader("Upload Receipt", type=['jpg', 'png', 'jpeg'])
+        uploaded_file = st.file_uploader("Upload Receipt", type=['jpg', 'png', 'jpeg', 'pdf'])
+        
         if st.form_submit_button("Log Expense"):
             if store and amt > 0:
-                receipt_name = uploaded_file.name if uploaded_file else "No Receipt"
+                # If a file is uploaded, we save it locally so we can view it later
+                receipt_name = "No Receipt"
+                if uploaded_file:
+                    receipt_name = uploaded_file.name
+                    # Create a 'receipts' folder if it doesn't exist
+                    if not os.path.exists("receipts"):
+                        os.makedirs("receipts")
+                    # Save the file into that folder
+                    with open(os.path.join("receipts", receipt_name), "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                
                 st.session_state.db['purchase_receipts'].append({
                     "date": str(datetime.now().strftime("%Y-%m-%d")), 
                     "store": store.upper(), 
@@ -198,24 +209,38 @@ with t3:
     if st.session_state.db['purchase_receipts']:
         st.write("---")
         df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
-        
-        # 1. Filter Logic
         df_p['date_dt'] = pd.to_datetime(df_p['date'])
         df_p['month_year'] = df_p['date_dt'].dt.strftime('%B %Y')
-        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique(), key="exp_month_filter")
+        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique())
         
-        # 2. Select and Capitalize Columns
-        f_df = df_p[df_p['month_year'] == sel_month][['date', 'store', 'total', 'receipt']].copy()
-        f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
+        # Filter the data
+        f_df = df_p[df_p['month_year'] == sel_month].copy()
         
-        # 3. Format Amount to 2 Decimals
-        formatted_expenses = f_df.style.format({
-            "AMOUNT": "₱{:,.2f}"
-        })
+        # Display the Table headers
+        h1, h2, h3, h4 = st.columns([1, 2, 1, 1])
+        h1.write("**DATE**"); h2.write("**STORE**"); h3.write("**AMOUNT**"); h4.write("**FILE**")
         
-        # 4. Show the Table
-        st.table(formatted_expenses)
-
+        for index, row in f_df.iterrows():
+            c1, c2, c3, c4 = st.columns([1, 2, 1, 1])
+            c1.write(row['date'])
+            c2.write(row['store'])
+            c3.write(f"₱{row['total']:,.2f}")
+            
+            # If there is a receipt, create a download button for it
+            if row['receipt'] != "No Receipt":
+                file_path = os.path.join("receipts", row['receipt'])
+                if os.path.exists(file_path):
+                    with open(file_path, "rb") as file:
+                        c4.download_button(
+                            label="👁️ View",
+                            data=file,
+                            file_name=row['receipt'],
+                            key=f"btn_{index}"
+                        )
+                else:
+                    c4.write("Missing")
+            else:
+                c4.write("None")
 # --- TAB 4: REPORTS ---
 with t4:
     st.markdown("### 📊 Business Performance")
