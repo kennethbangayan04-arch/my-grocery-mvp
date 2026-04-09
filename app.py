@@ -241,50 +241,29 @@ with t3:
                     c4.write("Missing")
             else:
                 c4.write("None")
-# --- TAB 4: REPORTS (With Exact Input Time) ---
-with t4:
-    st.markdown("### 📊 Business Performance")
-    if not s_df.empty:
-        # 1. Convert to datetime and sort
-        s_df['date'] = pd.to_datetime(s_df['date'])
-        s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
-        
-        sel_m = st.selectbox("Select Month", s_df['month_year'].unique(), key="rep_month_sel")
-        m_sales = s_df[s_df['month_year'] == sel_m].copy()
-        
-        # ... (keep your metric columns c1, c2, c3, c4 here) ...
-
-        st.write("---")
-        st.subheader("📝 Daily Transaction Log")
-        
-        # 2. Filter by Day
-        m_sales['just_date'] = m_sales['date'].dt.date
-        available_days = sorted(m_sales['just_date'].unique(), reverse=True)
-        sel_day = st.date_input("Select Day", value=available_days[0] if available_days else datetime.now().date())
-        
-        day_logs = m_sales[m_sales['just_date'] == sel_day].copy()
-        
+# --- TAB 4: REPORTS (Updated Transaction Log) ---
         if not day_logs.empty:
-            # 3. Group by Transaction ID to show merged receipts
-            # We take the 'first' date entry to get the exact input time
+            # 1. Group items by trans_id
             receipts = day_logs.groupby('trans_id').agg({
                 'date': 'first', 
                 'item': lambda x: ", ".join(x),
                 'total': 'sum'
             }).sort_values(by='date', ascending=False)
 
-            # 4. Format the TIME to 12-hour format (e.g., 01:45 PM)
+            # 2. Add the time and reset index to make trans_id a column we can rename
             receipts['TIME'] = receipts['date'].dt.strftime('%I:%M %p')
+            receipts = receipts.reset_index() # This turns the ID into a displayable column
             
-            # 5. Clean up the display table
-            log_display = receipts[['TIME', 'item', 'total']].copy()
-            log_display.columns = ["TIME", "ITEMS BOUGHT", "RECEIPT TOTAL"]
+            # 3. Select and Capitalize all column labels
+            log_display = receipts[['trans_id', 'TIME', 'item', 'total']].copy()
+            log_display.columns = ["TRANS ID", "TIME", "ITEMS BOUGHT", "TOTAL"]
             
             st.info(f"Total Daily Sales: **₱{receipts['total'].sum():,.2f}**")
-            # Use 2-decimal formatting for the total column
-            st.table(log_display.style.format({"RECEIPT TOTAL": "₱{:,.2f}"}))
-        else:
-            st.warning("No transactions found for this day.")
+            
+            # 4. Show the Table with 2-decimal formatting
+            st.table(log_display.style.format({
+                "TOTAL": "₱{:,.2f}"
+            }))
 
 # --- TAB 5: UTANG ---
 with t5:
