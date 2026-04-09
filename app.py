@@ -268,6 +268,8 @@ with t5:
     if st.session_state.db['debts']:
         st.write("---")
         d_df = pd.DataFrame(st.session_state.db['debts'])
+        
+        # Date Logic
         d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
         now_dt = pd.to_datetime(datetime.now().date())
         d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
@@ -292,6 +294,7 @@ with t5:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
         st.write("---")
+        # FIXED INDENTATION STARTING HERE
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
