@@ -5,7 +5,6 @@ import json
 import os
 import urllib.parse
 
-
 # --- 1. DATA ENGINE ---
 DB_FILE = 'negosyo_pro_master.json'
 
@@ -18,7 +17,6 @@ def load_data():
         except: pass
     return {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
 
-# To see 0.00, we ensure the session starts empty if no file exists
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
@@ -26,39 +24,128 @@ def save_data():
     with open(DB_FILE, 'w') as f:
         json.dump(st.session_state.db, f)
 
-# --- 2. BILINGUAL DICTIONARY ---
-st.set_page_config(page_title="Negosyo Pro", layout="wide", page_icon="🏪")
+# --- 2. BILINGUAL DICTIONARY & CONFIG ---
+st.set_page_config(page_title="Bentamate", layout="wide", page_icon="🏪")
+
+# Custom CSS for the Bentamate Cards
+st.markdown("""
+    <style>
+    .metric-card {
+        background-color: white; padding: 15px; border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #FFC0CB;
+        margin-bottom: 10px;
+    }
+    .metric-title { font-size: 12px; color: #666; font-weight: bold; text-transform: uppercase; }
+    .metric-value { font-size: 20px; font-weight: bold; color: #333; margin-top: 5px; }
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] {
+        height: 40px; white-space: pre-wrap; background-color: #f8f9fa;
+        border-radius: 5px; padding: 10px 20px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
 D = {
     "English": {
         "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
-        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Qty", "add_cart": "➕ Add to Cart",
-        "cart_h": "🛒 Current Cart", "total": "TOTAL", "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart",
-        "inv_h": "Stock Management", "btn_reg": "Register New Product", "name": "Product Name", 
-        "stock": "Current Stock", "bought": "Bought Price", "srp": "SRP",
-        "code": "CODE", "action": "ACTION", "add_stock": "ADD STOCK",
-        "rec_h": "Log Expenses", "store": "Store Name", "amt": "Amount Spent", "photo": "Upload Photo", "btn_save": "Save",
-        "rep_h": "Financial Summary", "rev": "Total Sales", "exp": "Total Expenses", "prof": "Net Profit",
-        "ut_h": "Debt Management", "cust": "Customer Name", "phone": "Mobile Number", "debt_amt": "Debt Amount",
-        "btn_sms": "Send SMS Reminder", "btn_paid": "✅ Mark as Paid", "low_stock": "⚠️ LOW STOCK!"
+        "rev": "Total Sales", "inv": "Total Products", "exp": "Expenses", "low": "Low Stock",
+        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Qty", "total": "TOTAL",
+        "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart", "low_stock": "⚠️ LOW STOCK!"
     },
     "Tagalog": {
         "tabs": ["⚡ Benta", "📦 Imbentaryo", "🧾 Gasto", "📊 Ulat", "💳 Utang"],
-        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "add_cart": "➕ Idagdag sa Cart",
-        "cart_h": "🛒 Mga Bibilhin", "total": "KABUUAN", "btn_sell": "🏁 Tapusin ang Benta", "btn_clear": "🗑️ Burahin ang Cart",
-        "inv_h": "Pamamahala ng Stock", "btn_reg": "I-rehistro ang Produkto", "name": "Pangalan ng Produkto",
-        "stock": "Bilang ng Stock", "bought": "Puhunan", "srp": "SRP",
-        "code": "KODIGO", "action": "AKSYON", "add_stock": "DAGDAG STOCK",
-        "rec_h": "Itala ang Gasto", "store": "Tindahan", "amt": "Halaga", "photo": "I-upload ang Resibo", "btn_save": "I-save",
-        "rep_h": "Ulat ng Kita", "rev": "Kabuuang Benta", "exp": "Kabuuang Gasto", "prof": "Netong Kita",
-        "ut_h": "Listahan ng Utang", "cust": "Customer", "phone": "Numero", "debt_amt": "Utang",
-        "btn_sms": "Magpadala ng SMS", "btn_paid": "✅ Bayad na", "low_stock": "⚠️ KONTI NA LANG!"
+        "rev": "Kabuuang Benta", "inv": "Produkto", "exp": "Gasto", "low": "Konti na lang",
+        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "total": "KABUUAN",
+        "btn_sell": "🏁 Tapusin ang Benta", "btn_clear": "🗑️ Burahin ang Cart", "low_stock": "⚠️ KONTI NA LANG!"
     }
 }[lang]
 
-st.title("🏪 Negosyo Pro")
-tabs = st.tabs(D["tabs"])
+# --- SIDEBAR ---
+st.sidebar.title("🏪 Bentamate")
+st.sidebar.caption("Your Smart Business Companion")
+if st.sidebar.button("🗑️ Reset for New Owner"):
+    st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    st.rerun()
+
+# --- HEADER SECTION (Metric Cards) ---
+s_df = pd.DataFrame(st.session_state.db['sales'])
+p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+today_sales = s_df[s_df['date'].str.contains(datetime.now().strftime("%Y-%m-%d"))]['total'].sum() if not s_df.empty else 0
+total_exp = p_df['total'].sum() if not p_df.empty else 0
+low_stock_val = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= 5)
+
+cols = st.columns(4)
+with cols[0]:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #ffcdd2;"><div class="metric-title">🌸 {D["rev"]} Today</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
+with cols[1]:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #bbdefb;"><div class="metric-title">📘 {D["inv"]}</div><div class="metric-value">{len(st.session_state.db["inventory"])}</div></div>', unsafe_allow_html=True)
+with cols[2]:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #fff9c4;"><div class="metric-title">📙 {D["exp"]}</div><div class="metric-value">₱{total_exp:,.2f}</div></div>', unsafe_allow_html=True)
+with cols[3]:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #b2dfdb;"><div class="metric-title">📉 {D["low"]}</div><div class="metric-value">{low_stock_val}</div></div>', unsafe_allow_html=True)
+
+# --- MAIN CONTENT (Tabs) ---
+t1, t2, t3, t4, t5 = st.tabs(D["tabs"])
+
+with t1:
+    st.markdown(f"### {D['sale_h']}")
+    if 'cart' not in st.session_state: st.session_state.cart = []
+    
+    col_in, col_qty = st.columns([3, 1])
+    b_in = col_in.text_input(D["input_c"], placeholder="Scan or type here...", key="sale_input", label_visibility="collapsed")
+    q_in = col_qty.number_input(D["qty"], min_value=1, value=1, key="qty_input")
+    
+    if b_in in st.session_state.db['inventory']:
+        item = st.session_state.db['inventory'][b_in]
+        st.info(f"✨ **{item['name']}** | ₱{item['price']:.2f} | Stock: {item['stock']}")
+        if st.button("➕ Add to Cart", use_container_width=True):
+            if item['stock'] >= q_in:
+                st.session_state.cart.append({
+                    "code": b_in, "name": item['name'], "qty": q_in, 
+                    "bought": item.get('bought', 0), "price": item['price'], "subtotal": item['price'] * q_in
+                })
+                st.rerun()
+            else: st.error("Out of stock!")
+
+    if st.session_state.cart:
+        st.write("---")
+        cart_df = pd.DataFrame(st.session_state.cart)
+        st.table(cart_df[['name', 'qty', 'price', 'subtotal']])
+        total_bill = cart_df['subtotal'].sum()
+        st.header(f"{D['total']}: ₱{total_bill:,.2f}")
+        
+        c_pay, c_clear = st.columns(2)
+        if c_pay.button(D["btn_sell"], type="primary", use_container_width=True):
+            for entry in st.session_state.cart:
+                st.session_state.db['inventory'][entry['code']]['stock'] -= entry['qty']
+                st.session_state.db['sales'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d %H:%M")), 
+                    "item": entry['name'], "qty": entry['qty'],
+                    "bought": entry['bought'], "srp": entry['price'], "total": entry['subtotal']
+                })
+            save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
+        if c_clear.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
+
+with t2:
+    st.markdown("### 📦 Inventory Stock")
+    for k, v in st.session_state.db['inventory'].items():
+        if v['stock'] <= 5: st.warning(f"{D['low_stock']} {v['name']} ({v['stock']})")
+    
+    # Registration form and inventory list logic remains same as your original
+    with st.expander("Register New Product"):
+        with st.form("reg"):
+            c = st.text_input("Code")
+            n = st.text_input("Name").upper()
+            col1, col2 = st.columns(2)
+            s = col1.number_input("Stock", min_value=0)
+            p = col2.number_input("SRP", min_value=0.0)
+            if st.form_submit_button("Save"):
+                st.session_state.db['inventory'][c] = {"name": n, "stock": s, "price": p, "min_alert": 5}
+                save_data(); st.rerun()
+
 
 # --- OWNER MANAGEMENT ---
 st.sidebar.write("---")
