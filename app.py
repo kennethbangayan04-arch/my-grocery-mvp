@@ -180,21 +180,18 @@ with t2:
 with t3:
     st.markdown(f"### {D['exp']}")
     with st.form("exp_form", clear_on_submit=True):
-        store = st.text_input("Store Name")
+        store_ex = st.text_input("Store Name")
         amt_ex = st.number_input("Amount", min_value=0.0)
         uploaded_file = st.file_uploader("Upload Receipt", type=['jpg', 'png', 'jpeg', 'pdf'])
         if st.form_submit_button("Log Expense"):
-            if store and amt_ex > 0:
+            if store_ex and amt_ex > 0:
                 receipt_name = "No Receipt"
                 if uploaded_file:
                     receipt_name = uploaded_file.name
                     if not os.path.exists("receipts"): os.makedirs("receipts")
                     with open(os.path.join("receipts", receipt_name), "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                st.session_state.db['purchase_receipts'].append({
-                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
-                    "store": store.upper(), "total": amt_ex, "receipt": receipt_name
-                })
+                st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().strftime("%Y-%m-%d")), "store": store_ex.upper(), "total": amt_ex, "receipt": receipt_name})
                 save_data(); st.success("Expense Recorded!"); st.rerun()
 
     if st.session_state.db['purchase_receipts']:
@@ -220,31 +217,25 @@ with t3:
                 else: c4.write("Missing")
             else: c4.write("None")
 
-# --- TAB 4: REPORTS (Clean Financial Version) ---
+# --- TAB 4: REPORTS ---
 with t4:
     st.markdown("### 📊 Business Performance")
     if not s_df.empty:
-        # 1. Align Dates
         s_df['date_dt'] = pd.to_datetime(s_df['date'])
         s_df['month_year'] = s_df['date_dt'].dt.strftime('%B %Y')
-        
         sel_m_rep = st.selectbox("Select Month", s_df['month_year'].unique(), key="rep_month_sel")
-        
-        # 2. Monthly Filtering
         m_sales_rep = s_df[s_df['month_year'] == sel_m_rep].copy()
         
+        # Monthly Expense Calculation
         p_df['date_dt'] = pd.to_datetime(p_df['date'])
         p_df['month_year'] = p_df['date_dt'].dt.strftime('%B %Y')
         m_expenses_rep = p_df[p_df['month_year'] == sel_m_rep]['total'].sum() if not p_df.empty else 0
         
-        # 3. Calculations
+        # Financial Metrics
         total_gross_sales = m_sales_rep['total'].sum()
-        # Gross Earnings = SRP minus Bought Price (The Markup)
         total_gross_earnings = ((m_sales_rep['srp'] - m_sales_rep['bought']) * m_sales_rep['qty']).sum()
-        # Net Profit = Earnings minus Expenses
         net_profit = total_gross_earnings - m_expenses_rep
 
-        # 4. Metric Display
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Gross Sales", f"₱{total_gross_sales:,.2f}")
         c2.metric("Gross Earnings", f"₱{total_gross_earnings:,.2f}")
@@ -253,45 +244,28 @@ with t4:
 
         st.write("---")
         st.subheader("📝 Daily Transaction Log")
-        
-        # Daily Log Display
         m_sales_rep['just_date'] = m_sales_rep['date_dt'].dt.date
         available_days = sorted(m_sales_rep['just_date'].unique(), reverse=True)
         sel_day_rep = st.date_input("Select Day", value=available_days[0] if available_days else datetime.now().date())
         
         day_logs_rep = m_sales_rep[m_sales_rep['just_date'] == sel_day_rep].copy()
         if not day_logs_rep.empty:
-            receipts_rep = day_logs_rep.groupby('trans_id').agg({
-                'date_dt': 'first', 
-                'item': lambda x: ", ".join(x), 
-                'total': 'sum'
-            }).sort_values(by='date_dt', ascending=False)
-            
+            receipts_rep = day_logs_rep.groupby('trans_id').agg({'date_dt': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'}).sort_values(by='date_dt', ascending=False)
             receipts_rep['TIME'] = receipts_rep['date_dt'].dt.strftime('%I:%M %p')
             receipts_rep = receipts_rep.reset_index()
-            
             log_display = receipts_rep[['trans_id', 'TIME', 'item', 'total']]
             log_display.columns = ["TRANS ID", "TIME", "ITEMS BOUGHT", "TOTAL"]
-            
             st.info(f"Total Daily Sales: **₱{receipts_rep['total'].sum():,.2f}**")
             st.table(log_display.style.format({"TOTAL": "₱{:,.2f}"}))
-        else:
-            st.info("No transactions recorded for this day.")
-    else:
-        st.info("No sales data available yet.")
-
-# --- TAB 4: ADDING THE GRAPH BACK ---
+        else: st.info("No transactions recorded for this day.")
+        
         st.write("---")
         st.subheader("📈 DAILY SALES TREND")
-        
-        # We group the monthly sales by date and sum the totals
         chart_data = m_sales_rep.groupby('just_date')['total'].sum()
-        
-        if not chart_data.empty:
-            st.line_chart(chart_data)
-        else:
-            st.info("Not enough data to generate a trend yet.")
-        
+        if not chart_data.empty: st.line_chart(chart_data)
+        else: st.info("Not enough data to generate a trend yet.")
+    else: st.info("No sales data available yet.")
+
 # --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
