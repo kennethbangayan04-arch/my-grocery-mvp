@@ -116,17 +116,26 @@ st.write("---")
 # We use emojis in the tab names to match the photo's icons
 t1, t2, t3, t4, t5 = st.tabs(["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"])
 
-# --- TAB 1: QUICK SALE (Redundancy Removed) ---
+# --- TAB 1: QUICK SALE ---
 with t1:
-    # Notice: No st.subheader here anymore!
-    if 'cart' not in st.session_state: st.session_state.cart = []
-    
-    st.markdown("### Register a Sale") # Matches the photo's bold text
+    st.markdown("### Register a Sale")
     col_in, col_qty = st.columns([3, 1])
-    b_in = col_in.text_input(D["input_c"], placeholder="Scan/Type Barcode", key="sale_in", label_visibility="collapsed")
-    q_in = col_qty.number_input(D["qty"], min_value=1, value=1, label_visibility="collapsed")
     
-    # Rest of your Sale logic...
+    # Ensure this key="sale_in" is NOT used anywhere else in your script
+    b_in = col_in.text_input(
+        D["input_c"], 
+        placeholder="Scan/Type Barcode", 
+        key="sale_barcode_input", # Changed key to be more unique
+        label_visibility="collapsed"
+    )
+    
+    q_in = col_qty.number_input(
+        D["qty"], 
+        min_value=1, 
+        value=1, 
+        key="sale_qty_input", # Added a unique key here too
+        label_visibility="collapsed"
+    )
 
 # --- TAB 2: INVENTORY (Redundancy Removed) ---
 with t2:
