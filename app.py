@@ -279,6 +279,18 @@ with t4:
             st.info("No transactions recorded for this day.")
     else:
         st.info("No sales data available yet.")
+
+# --- TAB 4: ADDING THE GRAPH BACK ---
+        st.write("---")
+        st.subheader("📈 DAILY SALES TREND")
+        
+        # We group the monthly sales by date and sum the totals
+        chart_data = m_sales_rep.groupby('just_date')['total'].sum()
+        
+        if not chart_data.empty:
+            st.line_chart(chart_data)
+        else:
+            st.info("Not enough data to generate a trend yet.")
         
 # --- TAB 5: UTANG ---
 with t5:
