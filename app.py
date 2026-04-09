@@ -84,17 +84,21 @@ total_expenses = p_df['total'].sum() if not p_df.empty else 0
 low_stock_threshold = 5 
 low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= low_stock_threshold)
 
-# --- TOP DASHBOARD DISPLAY (FIXED ORDER) ---
+# --- TOP DASHBOARD DISPLAY ---
 c1, c2, c3, c4 = st.columns(4)
 with c1: st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;"><div class="metric-title">{D["rev"]}</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;"><div class="metric-title">{D["inv"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
 with c3: st.markdown(f'<div class="metric-card" style="border-left-color: #fff3e0;"><div class="metric-title">{D["exp"]}</div><div class="metric-value">₱{total_expenses:,.2f}</div></div>', unsafe_allow_html=True)
 with c4: st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f1;"><div class="metric-title">{D["low"]}</div><div class="metric-value">{low_stock_count}</div></div>', unsafe_allow_html=True)
 
+# --- 🚨 CRITICAL LOW STOCK NOTIFICATION (STAYS ON TOP) ---
+if low_stock_count > 0:
+    st.error(f"⚠️ **{D['low_stock']}** {low_stock_count} items are below the safety limit! Check the Inventory tab to restock.")
+
 st.write("---")
 
+# --- NAVIGATION TABS ---
 t1, t2, t3, t4, t5 = st.tabs(D["tabs"])
-
 # --- TAB 1: QUICK SALE ---
 with t1:
     st.markdown(f"### {D['sale_h']}")
