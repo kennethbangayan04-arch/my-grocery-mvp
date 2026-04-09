@@ -161,22 +161,53 @@ with t2:
             if r6.button("🗑️", key=f"del_{code}"):
                 del st.session_state.db['inventory'][code]; save_data(); st.rerun()
 
-# --- TAB 3: EXPENSES ---
+# --- TAB 3: EXPENSES (With Receipt Upload) ---
 with t3:
     st.markdown(f"### {D['exp']}")
+    
     with st.form("exp_form", clear_on_submit=True):
         store = st.text_input("Store Name")
         amt = st.number_input("Amount", min_value=0.0)
+        
+        # --- NEW UPLOAD BUTTON ---
+        uploaded_file = st.file_uploader("Upload Receipt (Optional)", type=['jpg', 'png', 'jpeg'])
+        
         if st.form_submit_button("Log Expense"):
-            st.session_state.db['purchase_receipts'].append({"date": str(datetime.now().strftime("%Y-%m-%d")), "store": store.upper(), "total": amt})
-            save_data(); st.rerun()
+            if store and amt > 0:
+                receipt_name = "No Receipt"
+                
+                # Check if a file was actually uploaded
+                if uploaded_file is not None:
+                    receipt_name = uploaded_file.name
+                    # In a real app, you would save the file to a folder here
+                    # For a demo, we just record that it exists
+                
+                st.session_state.db['purchase_receipts'].append({
+                    "date": str(datetime.now().strftime("%Y-%m-%d")), 
+                    "store": store.upper(), 
+                    "total": amt,
+                    "receipt": receipt_name # Save the file name to the DB
+                })
+                save_data()
+                st.success("Expense Recorded!")
+                st.rerun()
+
+    # --- DISPLAY TABLE (Updated to show Receipt Status) ---
     if st.session_state.db['purchase_receipts']:
+        st.write("---")
         df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
         df_p['date'] = pd.to_datetime(df_p['date'])
         df_p['month_year'] = df_p['date'].dt.strftime('%B %Y')
-        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique())
-        st.table(df_p[df_p['month_year'] == sel_month][['date', 'store', 'total']])
-
+        
+        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique(), key="exp_month_filter")
+        
+        filtered_df = df_p[df_p['month_year'] == sel_month].copy()
+        
+        # Rename columns for a professional look in the table
+        display_df = filtered_df[['date', 'store', 'total', 'receipt']].copy()
+        display_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT FILE"]
+        
+        st.table(display_df)
 # --- TAB 4: REPORTS ---
 with t4:
     st.markdown("### Financial Analysis")
