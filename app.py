@@ -111,11 +111,7 @@ with t1:
         st.info(f"✨ **{item['name']}** | ₱{item['price']:.2f} | Stock: {item['stock']}")
         if st.button("➕ Add to Cart", use_container_width=True, key="add_to_cart"):
             if item['stock'] >= q_in:
-                st.session_state.cart.append({
-                    "code": b_in, "name": item['name'], "qty": q_in, 
-                    "bought": item.get('bought', 0), "price": item['price'], 
-                    "subtotal": item['price'] * q_in
-                })
+                st.session_state.cart.append({"code": b_in, "name": item['name'], "qty": q_in, "bought": item.get('bought', 0), "price": item['price'], "subtotal": item['price'] * q_in})
                 st.rerun()
             else: st.error("Out of stock!")
 
@@ -275,16 +271,16 @@ with t5:
         
         # Robust Date Logic
         d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
-        now_dt_pd = pd.to_datetime(datetime.now().date())
-        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt_pd).dt.days.fillna(0).astype(int)
+        now_dt = pd.to_datetime(datetime.now().date())
+        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
         
         display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
         display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
         def apply_row_styles(row):
             days = row['DAYS_LEFT']
-            if days < 0: return ['background-color: #ffcdd2'] * len(row)
-            if days <= 3: return ['background-color: #fff9c4'] * len(row)
+            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red
+            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow
             return [''] * len(row)
 
         st.table(
@@ -298,12 +294,13 @@ with t5:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
         st.write("---")
+        # FIXED INDENTATION: Aligned with the 'if' block (8 spaces)
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
         p_due = pd.to_datetime(pers['due_date'])
-        p_days = int((p_due - now_dt_pd).days) 
+        p_days = int((p_due - now_dt).days) 
 
         col_sms, col_pay = st.columns(2)
         with col_sms:
