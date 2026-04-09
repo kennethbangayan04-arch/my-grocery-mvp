@@ -86,4 +86,4 @@ with c4: st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f
 st.write("---")
 
 # --- NAVIGATION TABS ---
-t1, t2, t3, t4,
+t1, t2, t3, t4, t5 = st.tabs(["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"])
