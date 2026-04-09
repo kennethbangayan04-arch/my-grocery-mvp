@@ -40,29 +40,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-D = {
-    "English": {
-        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
-        "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
-        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL",
-        "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart", "low_stock": "⚠️ LOW STOCK!",
-        "action": "Actions", "add_stock": "Add Stock", "btn_paid": "Mark as Paid", "btn_sms": "Send SMS Reminder"
-    },
-    "Tagalog": {
-        "tabs": ["⚡ Benta", "📦 Imbentaryo", "🧾 Gasto", "📊 Ulat", "💳 Utang"],
-        "rev": "Benta Ngayon", "inv": "Produkto", "exp": "Kabuuang Gasto", "low": "Konti na lang",
-        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "total": "KABUUAN",
-        "btn_sell": "🏁 Tapusin ang Benta", "btn_clear": "🗑️ Burahin ang Cart", "low_stock": "⚠️ KONTI NA LANG!",
-        "action": "Aksyon", "add_stock": "Dagdag Stock", "btn_paid": "Bayad na", "btn_sms": "Mag-SMS Paalala"
-    }
-}
-
-# --- SIDEBAR (Clean & Optimized Layout) ---
+# --- 3. SIDEBAR (Fixed Order) ---
 st.sidebar.title("🏪 Bentamate")
 st.sidebar.markdown("##### Smart Business Companion")
 st.sidebar.write("---")
 
-# 1. Account Access Section
+# Account Access Section
 with st.sidebar.popover("👤 Account Access", use_container_width=True):
     auth_mode = st.radio("Choose Action", ["Sign In", "Create Account"])
     if auth_mode == "Sign In":
@@ -78,22 +61,41 @@ with st.sidebar.popover("👤 Account Access", use_container_width=True):
         if st.button("Register", use_container_width=True):
             st.toast("Account created (Demo Mode)!", icon="🎉")
 
-# 2. Language Selection
-lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
+# Language Selection (Must be BEFORE dictionary mapping)
+lang_choice = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
 
-# 3. Vertical Spacing (This pushes the next items to the bottom)
+# Dictionary mapping
+translations = {
+    "English": {
+        "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
+        "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
+        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL",
+        "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart", "low_stock": "⚠️ LOW STOCK!"
+    },
+    "Tagalog": {
+        "tabs": ["⚡ Benta", "📦 Imbentaryo", "🧾 Gasto", "📊 Ulat", "💳 Utang"],
+        "rev": "Benta Ngayon", "inv": "Produkto", "exp": "Kabuuang Gasto", "low": "Konti na lang",
+        "sale_h": "Itala ang Benta", "input_c": "I-scan ang Barcode", "qty": "Dami", "total": "KABUUAN",
+        "btn_sell": "🏁 Tapusin ang Benta", "btn_clear": "🗑️ Burahin ang Cart", "low_stock": "⚠️ KONTI NA LANG!"
+    }
+}
+D = translations[lang_choice]
+
+# Vertical Spacing for Reset
 for _ in range(15):
     st.sidebar.write("")
 
-# 4. Reset Button at the very bottom
+# Reset Button at the bottom
 st.sidebar.write("---")
 if st.sidebar.button("🗑️ Reset for New Owner", key="reset_button", use_container_width=True):
     st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): 
-        os.remove(DB_FILE)
+    if os.path.exists(DB_FILE): os.remove(DB_FILE)
     st.rerun()
-    
-# --- TOP DASHBOARD CALCULATIONS ---
+
+# --- 4. DASHBOARD CALCULATIONS ---
+st.title("🏪 Bentamate")
+st.markdown("##### Smart Business Companion")
+
 s_df = pd.DataFrame(st.session_state.db['sales'])
 p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
 today_str = datetime.now().strftime("%Y-%m-%d")
@@ -104,7 +106,7 @@ total_expenses = p_df['total'].sum() if not p_df.empty else 0
 low_stock_threshold = 5 
 low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= low_stock_threshold)
 
-# --- TOP DASHBOARD DISPLAY ---
+# --- 5. TOP DASHBOARD DISPLAY ---
 c1, c2, c3, c4 = st.columns(4)
 with c1: st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;"><div class="metric-title">{D["rev"]}</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;"><div class="metric-title">{D["inv"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
@@ -171,7 +173,7 @@ with t2:
             b_i = cb.number_input("Bought Price", min_value=0.0)
             p_i = cp.number_input("SRP", min_value=0.0)
             if st.form_submit_button("Save"):
-                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "bought": b_i, "price": p_i, "min_alert": 5}
+                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "bought": b_i, "price": p_i}
                 save_data(); st.rerun()
 
     st.write("---")
@@ -205,9 +207,8 @@ with t3:
         uploaded_file = st.file_uploader("Upload Receipt", type=['jpg', 'png', 'jpeg', 'pdf'])
         if st.form_submit_button("Log Expense"):
             if store_ex and amt_ex > 0:
-                receipt_name = "No Receipt"
+                receipt_name = uploaded_file.name if uploaded_file else "No Receipt"
                 if uploaded_file:
-                    receipt_name = uploaded_file.name
                     if not os.path.exists("receipts"): os.makedirs("receipts")
                     with open(os.path.join("receipts", receipt_name), "wb") as f:
                         f.write(uploaded_file.getbuffer())
@@ -246,21 +247,19 @@ with t4:
         sel_m_rep = st.selectbox("Select Month", s_df['month_year'].unique(), key="rep_month_sel")
         m_sales_rep = s_df[s_df['month_year'] == sel_m_rep].copy()
         
-        # Monthly Expense Calculation
         p_df['date_dt'] = pd.to_datetime(p_df['date'])
         p_df['month_year'] = p_df['date_dt'].dt.strftime('%B %Y')
         m_expenses_rep = p_df[p_df['month_year'] == sel_m_rep]['total'].sum() if not p_df.empty else 0
         
-        # Financial Metrics
         total_gross_sales = m_sales_rep['total'].sum()
         total_gross_earnings = ((m_sales_rep['srp'] - m_sales_rep['bought']) * m_sales_rep['qty']).sum()
         net_profit = total_gross_earnings - m_expenses_rep
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Gross Sales", f"₱{total_gross_sales:,.2f}")
-        c2.metric("Gross Earnings", f"₱{total_gross_earnings:,.2f}")
-        c3.metric("Expenses", f"₱{m_expenses_rep:,.2f}")
-        c4.metric("Net Profit", f"₱{net_profit:,.2f}")
+        rc1, rc2, rc3, rc4 = st.columns(4)
+        rc1.metric("Gross Sales", f"₱{total_gross_sales:,.2f}")
+        rc2.metric("Gross Earnings", f"₱{total_gross_earnings:,.2f}")
+        rc3.metric("Expenses", f"₱{m_expenses_rep:,.2f}")
+        rc4.metric("Net Profit", f"₱{net_profit:,.2f}")
 
         st.write("---")
         st.subheader("📝 Daily Transaction Log")
@@ -277,7 +276,6 @@ with t4:
             log_display.columns = ["TRANS ID", "TIME", "ITEMS BOUGHT", "TOTAL"]
             st.info(f"Total Daily Sales: **₱{receipts_rep['total'].sum():,.2f}**")
             st.table(log_display.style.format({"TOTAL": "₱{:,.2f}"}))
-        else: st.info("No transactions recorded for this day.")
         
         st.write("---")
         st.subheader("📈 DAILY SALES TREND")
