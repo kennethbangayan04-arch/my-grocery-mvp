@@ -207,68 +207,74 @@ with t3:
         f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
         st.table(f_df)
 
-# --- TAB 4: REPORTS (The Full Financial Picture) ---
+# --- TAB 4: REPORTS (Financials & Daily Transaction Logs) ---
 with t4:
     st.markdown("### 📊 Business Performance")
     
     if not s_df.empty:
-        # 1. Data Prep
+        # 1. Monthly Overview Logic
         s_df['date'] = pd.to_datetime(s_df['date'])
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
         
-        # Month Filter
         available_months = s_df['month_year'].unique()
         sel_m = st.selectbox("Select Month", available_months, index=len(available_months)-1, key="rep_month_sel")
         
-        # Filter monthly data
         m_sales = s_df[s_df['month_year'] == sel_m].copy()
         
-        # 2. CALCULATIONS (Material Balance of Cash)
-        
-        # A. GROSS SALES: Total cash collected from customers
+        # Calculations
         total_gross = m_sales['total'].sum()
-        
-        # B. EARNINGS (MARKUP): (SRP - Puhunan) * Qty
-        # This is the profit from your items before expenses
         total_markup_earnings = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
         
-        # C. TOTAL EXPENSES: Operating costs from Tab 3
         m_exp_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
         exp_total = 0
         if not m_exp_df.empty:
             m_exp_df['date'] = pd.to_datetime(m_exp_df['date'])
             exp_total = m_exp_df[m_exp_df['date'].dt.strftime('%B %Y') == sel_m]['total'].sum()
         
-        # D. NET PROFIT: Earnings - Expenses
         net_profit = total_markup_earnings - exp_total
 
-        # 3. DISPLAY METRICS (4 Columns for Clarity)
-        st.write(f"#### Financial Breakdown for {sel_m}")
+        # Display Monthly Metrics
         c1, c2, c3, c4 = st.columns(4)
-        
-        with c1:
-            st.metric("Gross Sales", f"₱{total_gross:,.2f}")
-            st.caption("Total Cash Inflow")
-            
-        with c2:
-            st.metric("Earnings", f"₱{total_markup_earnings:,.2f}")
-            st.caption("Profit from Items")
-            
-        with c3:
-            st.metric("Total Expenses", f"₱{exp_total:,.2f}", delta_color="inverse")
-            st.caption("Bills & Receipts")
-            
-        with c4:
-            # Net Profit is the "Bottom Line"
-            st.metric("Net Profit", f"₱{net_profit:,.2f}")
-            st.caption("Final Take-Home")
+        c1.metric("Gross Sales", f"₱{total_gross:,.2f}")
+        c2.metric("Earnings", f"₱{total_markup_earnings:,.2f}")
+        c3.metric("Total Expenses", f"₱{exp_total:,.2f}")
+        c4.metric("Net Profit", f"₱{net_profit:,.2f}")
 
         st.write("---")
         
-        # 4. TRENDS
-        st.subheader("Daily Sales Performance")
-        m_sales['day'] = m_sales['date'].dt.date
-        st.line_chart(m_sales.groupby('day')['total'].sum())
+        # 2. DAILY TRANSACTION LOG (THE NEW PART)
+        st.subheader("📝 Daily Transaction Log")
+        
+        # Get unique dates from the selected month
+        m_sales['just_date'] = m_sales['date'].dt.date
+        available_days = sorted(m_sales['just_date'].unique(), reverse=True)
+        
+        sel_day = st.date_input("Select Day to View Transactions", 
+                               value=available_days[0] if available_days else datetime.now().date())
+        
+        # Filter sales for that specific day
+        day_logs = m_sales[m_sales['just_date'] == sel_day].copy()
+        
+        if not day_logs.empty:
+            # Format the time for the table
+            day_logs['TIME'] = day_logs['date'].dt.strftime('%I:%M %p')
+            
+            # Select and rename columns for a professional look
+            log_display = day_logs[['TIME', 'item', 'qty', 'srp', 'total']].copy()
+            log_display.columns = ["TIME", "PRODUCT", "QTY", "PRICE", "TOTAL"]
+            
+            # Show summary for the day
+            day_total = log_display['TOTAL'].sum()
+            st.info(f"Total Sales for {sel_day.strftime('%B %d, %Y')}: **₱{day_total:,.2f}**")
+            
+            # Display the log table
+            st.dataframe(log_display, use_container_width=True, hide_index=True)
+        else:
+            st.warning("No transactions found for this specific date.")
+
+        st.write("---")
+        st.subheader("Daily Sales Trend")
+        st.line_chart(m_sales.groupby('just_date')['total'].sum())
         
     else:
         st.info("No data available to generate reports yet.")
