@@ -74,7 +74,55 @@ if st.sidebar.button("🗑️ Reset for New Owner" if lang == "English" else "�
         
     st.sidebar.success("System Reset!")
     st.rerun()
-    
+   
+# --- 3. MODERN UI CSS  ---
+st.markdown("""
+    <style>
+    .metric-card {
+        background-color: white; padding: 20px; border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1); border-left: 10px solid #FFC0CB;
+    }
+    .metric-title { font-size: 14px; color: #666; font-weight: bold; }
+    .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- TOP METRIC CARDS LOGIC ---
+s_df = pd.DataFrame(st.session_state.db['sales'])
+p_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+today_str = datetime.now().strftime("%Y-%m-%d")
+
+# Calculate data for the cards
+today_sales = s_df[s_df['date'].str.contains(today_str)]['total'].sum() if not s_df.empty else 0
+total_products = len(st.session_state.db['inventory'])
+weekly_expenses = p_df['total'].sum() if not p_df.empty else 0
+low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= v['min_alert'])
+
+# --- DISPLAY TOP DASHBOARD (Like the photo) ---
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;">'
+                f'<div class="metric-title">🛒 {D["rev"]} Today</div>'
+                f'<div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
+with c2:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;">'
+                f'<div class="metric-title">📦 {D["inv_h"]}</div>'
+                f'<div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
+with c3:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #fff3e0;">'
+                f'<div class="metric-title">🧾 {D["exp"]}</div>'
+                f'<div class="metric-value">₱{weekly_expenses:,.2f}</div></div>', unsafe_allow_html=True)
+with c4:
+    st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f1;">'
+                f'<div class="metric-title">📉 {D["low_stock"]}</div>'
+                f'<div class="metric-value">{low_stock_count}</div></div>', unsafe_allow_html=True)
+
+st.write("") # Spacer
+
+# --- 4. NAVIGATION BAR (The Tabbed View) ---
+# Replace your current st.tabs line with this:
+tabs = st.tabs([f"🎴 {t}" for t in D["tabs"]])
 # --- TAB 1: QUICK SALE ---
 with tabs[0]:
     st.subheader(D["sale_h"])
