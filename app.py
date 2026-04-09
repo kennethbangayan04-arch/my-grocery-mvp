@@ -59,42 +59,41 @@ D = {
     }
 }[lang]
 
-# --- SIDEBAR ---
+# --- SIDEBAR (Clean & Optimized) ---
 st.sidebar.title("🏪 Bentamate")
-st.sidebar.caption("Smart Business Companion")
-st.sidebar.write("---")
 
-if st.sidebar.button("🗑️ Reset for New Owner", key="reset_button"):
-    st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
-    st.rerun()
-
-st.title("🏪 Bentamate")
-st.markdown("##### Smart Business Companion")
-st.write("")
-
-# --- SIDEBAR (Branded & Auth) ---
-st.sidebar.title("🏪 Bentamate")
-st.sidebar.caption("Smart Business Companion")
-
-# --- MOCK LOGIN SECTION ---
+# 1. Account Access at the Top
 with st.sidebar.popover("👤 Account Access", use_container_width=True):
-    auth_mode = st.radio("Choose Action", ["Sign In", "Create Account"])
-    
+    auth_mode = st.radio("Action", ["Sign In", "Create Account"])
     if auth_mode == "Sign In":
-        st.text_input("Email or Username", placeholder="juan@email.com")
+        st.text_input("Username")
         st.text_input("Password", type="password")
         if st.button("Login", use_container_width=True):
-            st.success("Logged in successfully!")
+            st.success("Welcome back!")
     else:
         st.text_input("Full Name")
-        st.text_input("Email", placeholder="juan@email.com")
-        st.text_input("Create Password", type="password")
-        st.text_input("Confirm Password", type="password")
-        if st.button("Register", use_container_width=True):
-            st.toast("Account created (Demo Mode)!", icon="🎉")
+        st.text_input("Email")
+        st.text_input("Password", type="password")
+        if st.button("Create Account", use_container_width=True):
+            st.toast("Registered!", icon="🎉")
 
 st.sidebar.write("---")
+
+# 2. Language Selection
+lang = st.sidebar.radio("Wika / Language", ["English", "Tagalog"])
+
+# Add some vertical space to push the reset button down
+for _ in range(15):
+    st.sidebar.write("")
+
+# 3. Danger Zone / Reset at the Bottom
+st.sidebar.write("---")
+with st.sidebar.expander("⚠️ Danger Zone"):
+    if st.sidebar.button("🗑️ Reset for New Owner", use_container_width=True, key="reset_button"):
+        st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
+        if os.path.exists(DB_FILE): 
+            os.remove(DB_FILE)
+        st.rerun()
 
 # --- TOP DASHBOARD CALCULATIONS ---
 s_df = pd.DataFrame(st.session_state.db['sales'])
