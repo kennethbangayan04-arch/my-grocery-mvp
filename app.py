@@ -123,15 +123,45 @@ t1, t2, t3, t4, t5 = st.tabs(["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses
 
 # --- TAB 1: QUICK SALE ---
 with t1:
-    # Notice: NO st.subheader here. Just the action.
+    # 1. This must be indented 4 spaces
     st.markdown("### Register a Sale") 
-    col_in, col_qty = st.columns([3, 1])
-    # Placeholder acts as the label to save space
-    b_in = col_in.text_input(D["input_c"], placeholder="Scan/Type Barcode", key="main_barcode_in", label_visibility="collapsed")
-    q_in = col_qty.number_input(D["qty"], min_value=1, value=1, key="main_qty_in", label_visibility="collapsed")
     
-    # ... (Rest of Sale logic: Add to Cart, Checkout, etc.)
-
+    col_in, col_qty = st.columns([3, 1])
+    
+    # 2. All these lines must also be indented 4 spaces
+    b_in = col_in.text_input(
+        D["input_c"], 
+        placeholder="Scan/Type Barcode", 
+        key="main_barcode_in", 
+        label_visibility="collapsed"
+    )
+    
+    q_in = col_qty.number_input(
+        D["qty"], 
+        min_value=1, 
+        value=1, 
+        key="main_qty_in", 
+        label_visibility="collapsed"
+    )
+    
+    # Check if item exists in inventory
+    if b_in in st.session_state.db['inventory']:
+        item = st.session_state.db['inventory'][b_in]
+        st.info(f"✨ **{item['name']}** | ₱{item['price']:.2f} | Stock: {item['stock']}")
+        
+        if st.button(D["add_cart"], type="secondary"):
+            if item['stock'] >= q_in:
+                st.session_state.cart.append({
+                    "code": b_in, 
+                    "name": item['name'], 
+                    "qty": q_in, 
+                    "bought": item.get('bought', 0), 
+                    "price": item['price'], 
+                    "subtotal": item['price'] * q_in
+                })
+                st.rerun()
+            else:
+                st.error("Out of stock!")
 # --- TAB 2: INVENTORY ---
 with t2:
     # No Header. Directly to Alerts and Stock Management.
