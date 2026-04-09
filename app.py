@@ -46,7 +46,7 @@ D = {
     "English": {
         "tabs": ["⚡ Quick Sale", "📦 Inventory", "🧾 Expenses", "📊 Reports", "💳 Utang"],
         "rev": "Total Sales Today", "inv": "Total Products", "exp": "Total Expenses", "low": "Low Stock",
-        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Qty", "total": "TOTAL",
+        "sale_h": "Register a Sale", "input_c": "Scan/Type Barcode", "qty": "Quantity", "total": "TOTAL",
         "btn_sell": "🏁 Complete Sale", "btn_clear": "🗑️ Clear Cart", "low_stock": "⚠️ LOW STOCK!",
         "action": "Actions", "add_stock": "Add Stock", "btn_paid": "Mark as Paid", "btn_sms": "Send SMS Reminder"
     },
@@ -59,7 +59,7 @@ D = {
     }
 }[lang]
 
-# --- SIDEBAR (Branded) ---
+# --- SIDEBAR ---
 st.sidebar.title("🏪 Bentamate")
 st.sidebar.caption("Smart Business Companion")
 st.sidebar.write("---")
@@ -92,7 +92,7 @@ with c3: st.markdown(f'<div class="metric-card" style="border-left-color: #fff3e
 with c4: st.markdown(f'<div class="metric-card" style="border-left-color: #e0f2f1;"><div class="metric-title">{D["low"]}</div><div class="metric-value">{low_stock_count}</div></div>', unsafe_allow_html=True)
 
 if low_stock_count > 0:
-    st.error(f"**{D['low_stock']}** {low_stock_count} items are below the safety limit! Check the Inventory tab to restock.")
+    st.error(f"**{D['low_stock']}** {low_stock_count} items are below the safety limit!")
 
 st.write("---")
 
@@ -118,24 +118,24 @@ with t1:
     if st.session_state.cart:
         st.write("---")
         cart_df = pd.DataFrame(st.session_state.cart)
-        st.table(cart_df[['name', 'qty', 'price', 'subtotal']])
+        display_cart = cart_df[['name', 'qty', 'price', 'subtotal']].copy()
+        display_cart.columns = ["NAME", "QUANTITY", "PRICE", "SUBTOTAL"] 
+        formatted_cart = display_cart.style.format({"PRICE": "₱{:,.2f}", "SUBTOTAL": "₱{:,.2f}"})
+        
+        st.table(formatted_cart)
         total_bill = cart_df['subtotal'].sum()
         st.header(f"{D['total']}: ₱{total_bill:,.2f}")
-        cp, cc = st.columns(2)
         
+        cp, cc = st.columns(2)
         if cp.button(D["btn_sell"], type="primary", use_container_width=True):
-            # Batch ID for grouping
             trans_id = datetime.now().strftime("%H%M%S") 
             for entry in st.session_state.cart:
                 st.session_state.db['inventory'][entry['code']]['stock'] -= entry['qty']
                 st.session_state.db['sales'].append({
                     "trans_id": trans_id,
                     "date": str(datetime.now().strftime("%Y-%m-%d %H:%M")), 
-                    "item": entry['name'], 
-                    "qty": entry['qty'], 
-                    "bought": entry['bought'], 
-                    "srp": entry['price'], 
-                    "total": entry['subtotal']
+                    "item": entry['name'], "qty": entry['qty'], 
+                    "bought": entry['bought'], "srp": entry['price'], "total": entry['subtotal']
                 })
             save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
         if cc.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
@@ -156,7 +156,7 @@ with t2:
                 save_data(); st.rerun()
 
     st.write("---")
-    search_query = st.text_input("🔍 Search Product", placeholder="Enter Barcode or Product Name...").upper()
+    search_query = st.text_input("🔍 Search Product", key="inv_search").upper()
 
     if st.session_state.db['inventory']:
         h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
@@ -170,7 +170,7 @@ with t2:
                 r4.write(f"₱{det['price']:.2f}")
                 with r5:
                     with st.popover("➕"):
-                        amt = st.number_input("Qty", min_value=1, key=f"add_inv_{code}")
+                        amt = st.number_input("Quantity", min_value=1, key=f"add_inv_{code}")
                         if st.button("Save", key=f"btn_inv_{code}"):
                             st.session_state.db['inventory'][code]['stock'] += amt
                             save_data(); st.rerun()
@@ -194,7 +194,7 @@ with t3:
         df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
         df_p['date'] = pd.to_datetime(df_p['date'])
         df_p['month_year'] = df_p['date'].dt.strftime('%B %Y')
-        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique(), key="exp_month_filter")
+        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique())
         f_df = df_p[df_p['month_year'] == sel_month][['date', 'store', 'total', 'receipt']].copy()
         f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
         st.table(f_df)
@@ -205,7 +205,7 @@ with t4:
     if not s_df.empty:
         s_df['date'] = pd.to_datetime(s_df['date'])
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
-        sel_m = st.selectbox("Select Month", s_df['month_year'].unique(), key="rep_month_sel")
+        sel_m = st.selectbox("Select Month", s_df['month_year'].unique())
         m_sales = s_df[s_df['month_year'] == sel_m].copy()
         
         total_gross = m_sales['total'].sum()
@@ -227,21 +227,12 @@ with t4:
         day_logs = m_sales[m_sales['just_date'] == sel_day].copy()
         if not day_logs.empty:
             if 'trans_id' not in day_logs.columns: day_logs['trans_id'] = "Legacy"
-            
-            # MERGE ITEMS BY TRANS_ID
-            receipts = day_logs.groupby('trans_id').agg({
-                'date': 'first',
-                'item': lambda x: ", ".join(x),
-                'total': 'sum'
-            }).sort_values(by='date', ascending=False)
-
+            receipts = day_logs.groupby('trans_id').agg({'date': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'}).sort_values(by='date', ascending=False)
             receipts['TIME'] = receipts['date'].dt.strftime('%I:%M %p')
             log_display = receipts[['TIME', 'item', 'total']]
             log_display.columns = ["TIME", "ITEMS BOUGHT", "RECEIPT TOTAL"]
             st.info(f"Total Daily Sales: **₱{receipts['total'].sum():,.2f}**")
             st.dataframe(log_display, use_container_width=True, hide_index=True)
-        else:
-            st.warning("No transactions found.")
         
         st.write("---")
         st.subheader("Daily Sales Trend")
@@ -253,23 +244,72 @@ with t4:
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
+    today_dt_obj = datetime.now().date()
+    max_due = today_dt_obj + pd.Timedelta(days=7)
+    
     with st.form("u_form", clear_on_submit=True):
-        un = st.text_input("Name").upper()
-        up = st.text_input("Phone")
-        ua = st.number_input("Amount", min_value=0.0)
-        if st.form_submit_button("Add Debt"):
-            existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
-            if existing + ua > CREDIT_LIMIT:
-                st.error(f"Limit Reached! Current: ₱{existing}")
-            else:
-                st.session_state.db['debts'].append({"name": un, "phone": up, "amount": ua, "date": str(datetime.now().date())})
-                save_data(); st.success("Debt Added"); st.rerun()
+        un = st.text_input("NAME").upper()
+        up = st.text_input("PHONE")
+        ua = st.number_input("AMOUNT", min_value=0.0)
+        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_dt_obj, max_value=max_due)
+        
+        if st.form_submit_button("ADD DEBT"):
+            if un and up and ua > 0:
+                existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
+                if existing + ua > CREDIT_LIMIT:
+                    st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
+                else:
+                    st.session_state.db['debts'].append({
+                        "name": un, "phone": up, "amount": ua, 
+                        "date": str(today_dt_obj), "due_date": str(ud)
+                    })
+                    save_data(); st.success("Debt Added Successfully"); st.rerun()
 
     if st.session_state.db['debts']:
-        st.table(pd.DataFrame(st.session_state.db['debts']))
-        idx = st.selectbox("Select Debtor", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'], key="sms_sel")
+        st.write("---")
+        d_df = pd.DataFrame(st.session_state.db['debts'])
+        
+        # Robust Date Logic
+        d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
+        now_dt = pd.to_datetime(datetime.now().date())
+        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
+        
+        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
+        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
+        
+        def apply_row_styles(row):
+            days = row['DAYS_LEFT']
+            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red
+            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow
+            return [''] * len(row)
+
+        st.table(
+            display_debt.style.apply(apply_row_styles, axis=1)
+            .format({"AMOUNT": "₱{:,.2f}"})
+            .hide(axis="columns", subset=["DAYS_LEFT"]) 
+        )
+        
+        upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
+        if not upcoming.empty:
+            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
+
+        st.write("---")
+        # FIXED INDENTATION: Aligned with the 'if' block (8 spaces)
+        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
+                           format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
-        msg = f"Reminder of your balance at Bentamate: ₱{pers['amount']:.2f}."
-        st.link_button("Send SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}")
-        if st.button("Mark Paid", type="primary", key="pay_btn"):
-            st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+        
+        p_due = pd.to_datetime(pers['due_date'])
+        p_days = int((p_due - now_dt).days) 
+
+        col_sms, col_pay = st.columns(2)
+        with col_sms:
+            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
+            if p_days <= 3:
+                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
+            
+            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
+        
+        with col_pay:
+            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
+                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
