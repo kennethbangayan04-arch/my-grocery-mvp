@@ -121,7 +121,6 @@ with t1:
         display_cart = cart_df[['name', 'qty', 'price', 'subtotal']].copy()
         display_cart.columns = ["NAME", "QUANTITY", "PRICE", "SUBTOTAL"] 
         formatted_cart = display_cart.style.format({"PRICE": "₱{:,.2f}", "SUBTOTAL": "₱{:,.2f}"})
-        
         st.table(formatted_cart)
         total_bill = cart_df['subtotal'].sum()
         st.header(f"{D['total']}: ₱{total_bill:,.2f}")
@@ -177,164 +176,129 @@ with t2:
                 if r6.button("🗑️", key=f"del_inv_{code}"):
                     del st.session_state.db['inventory'][code]; save_data(); st.rerun()
 
-# --- TAB 3: EXPENSES (With File Viewing) ---
+# --- TAB 3: EXPENSES ---
 with t3:
     st.markdown(f"### {D['exp']}")
     with st.form("exp_form", clear_on_submit=True):
         store = st.text_input("Store Name")
-        amt = st.number_input("Amount", min_value=0.0)
+        amt_ex = st.number_input("Amount", min_value=0.0)
         uploaded_file = st.file_uploader("Upload Receipt", type=['jpg', 'png', 'jpeg', 'pdf'])
-        
         if st.form_submit_button("Log Expense"):
-            if store and amt > 0:
-                # If a file is uploaded, we save it locally so we can view it later
+            if store and amt_ex > 0:
                 receipt_name = "No Receipt"
                 if uploaded_file:
                     receipt_name = uploaded_file.name
-                    # Create a 'receipts' folder if it doesn't exist
-                    if not os.path.exists("receipts"):
-                        os.makedirs("receipts")
-                    # Save the file into that folder
+                    if not os.path.exists("receipts"): os.makedirs("receipts")
                     with open(os.path.join("receipts", receipt_name), "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                
                 st.session_state.db['purchase_receipts'].append({
                     "date": str(datetime.now().strftime("%Y-%m-%d")), 
-                    "store": store.upper(), 
-                    "total": amt, 
-                    "receipt": receipt_name
+                    "store": store.upper(), "total": amt_ex, "receipt": receipt_name
                 })
                 save_data(); st.success("Expense Recorded!"); st.rerun()
 
     if st.session_state.db['purchase_receipts']:
         st.write("---")
-        df_p = pd.DataFrame(st.session_state.db['purchase_receipts'])
-        df_p['date_dt'] = pd.to_datetime(df_p['date'])
-        df_p['month_year'] = df_p['date_dt'].dt.strftime('%B %Y')
-        sel_month = st.selectbox("Filter Month", df_p['month_year'].unique())
+        df_p_view = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        df_p_view['date_dt'] = pd.to_datetime(df_p_view['date'])
+        df_p_view['month_year'] = df_p_view['date_dt'].dt.strftime('%B %Y')
+        sel_month_ex = st.selectbox("Filter Month", df_p_view['month_year'].unique(), key="ex_month_sel")
+        f_df_ex = df_p_view[df_p_view['month_year'] == sel_month_ex].copy()
         
-        # Filter the data
-        f_df = df_p[df_p['month_year'] == sel_month].copy()
-        
-        # Display the Table headers
         h1, h2, h3, h4 = st.columns([1, 2, 1, 1])
         h1.write("**DATE**"); h2.write("**STORE**"); h3.write("**AMOUNT**"); h4.write("**FILE**")
-        
-        for index, row in f_df.iterrows():
+        for idx, row in f_df_ex.iterrows():
             c1, c2, c3, c4 = st.columns([1, 2, 1, 1])
             c1.write(row['date'])
             c2.write(row['store'])
             c3.write(f"₱{row['total']:,.2f}")
-            
-            # If there is a receipt, create a download button for it
             if row['receipt'] != "No Receipt":
-                file_path = os.path.join("receipts", row['receipt'])
-                if os.path.exists(file_path):
-                    with open(file_path, "rb") as file:
-                        c4.download_button(
-                            label="👁️ View",
-                            data=file,
-                            file_name=row['receipt'],
-                            key=f"btn_{index}"
-                        )
-                else:
-                    c4.write("Missing")
-            else:
-                c4.write("None")
-# --- TAB 4: REPORTS (Updated Transaction Log) ---
-        if not day_logs.empty:
-            # 1. Group items by trans_id
-            receipts = day_logs.groupby('trans_id').agg({
-                'date': 'first', 
-                'item': lambda x: ", ".join(x),
-                'total': 'sum'
-            }).sort_values(by='date', ascending=False)
+                f_path = os.path.join("receipts", row['receipt'])
+                if os.path.exists(f_path):
+                    with open(f_path, "rb") as f:
+                        c4.download_button("👁️ View", f, file_name=row['receipt'], key=f"ex_btn_{idx}")
+                else: c4.write("Missing")
+            else: c4.write("None")
 
-            # 2. Add the time and reset index to make trans_id a column we can rename
-            receipts['TIME'] = receipts['date'].dt.strftime('%I:%M %p')
-            receipts = receipts.reset_index() # This turns the ID into a displayable column
-            
-            # 3. Select and Capitalize all column labels
-            log_display = receipts[['trans_id', 'TIME', 'item', 'total']].copy()
+# --- TAB 4: REPORTS ---
+with t4:
+    st.markdown("### 📊 Business Performance")
+    if not s_df.empty:
+        s_df['date_dt'] = pd.to_datetime(s_df['date'])
+        s_df['month_year'] = s_df['date_dt'].dt.strftime('%B %Y')
+        sel_m_rep = st.selectbox("Select Month", s_df['month_year'].unique(), key="rep_month_sel")
+        m_sales_rep = s_df[s_df['month_year'] == sel_m_rep].copy()
+        
+        total_gross = m_sales_rep['total'].sum()
+        total_earnings = ((m_sales_rep['srp'] - m_sales_rep['bought']) * m_sales_rep['qty']).sum()
+        
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Gross Sales", f"₱{total_gross:,.2f}")
+        c2.metric("Earnings", f"₱{total_earnings:,.2f}")
+        c3.metric("Net Profit", f"₱{total_earnings - total_expenses:,.2f}")
+
+        st.write("---")
+        st.subheader("📝 Daily Transaction Log")
+        m_sales_rep['just_date'] = m_sales_rep['date_dt'].dt.date
+        available_days = sorted(m_sales_rep['just_date'].unique(), reverse=True)
+        sel_day_rep = st.date_input("Select Day", value=available_days[0] if available_days else datetime.now().date())
+        
+        day_logs_rep = m_sales_rep[m_sales_rep['just_date'] == sel_day_rep].copy()
+        if not day_logs_rep.empty:
+            receipts_rep = day_logs_rep.groupby('trans_id').agg({'date_dt': 'first', 'item': lambda x: ", ".join(x), 'total': 'sum'}).sort_values(by='date_dt', ascending=False)
+            receipts_rep['TIME'] = receipts_rep['date_dt'].dt.strftime('%I:%M %p')
+            receipts_rep = receipts_rep.reset_index()
+            log_display = receipts_rep[['trans_id', 'TIME', 'item', 'total']]
             log_display.columns = ["TRANS ID", "TIME", "ITEMS BOUGHT", "TOTAL"]
-            
-            st.info(f"Total Daily Sales: **₱{receipts['total'].sum():,.2f}**")
-            
-            # 4. Show the Table with 2-decimal formatting
-            st.table(log_display.style.format({
-                "TOTAL": "₱{:,.2f}"
-            }))
+            st.info(f"Total Daily Sales: **₱{receipts_rep['total'].sum():,.2f}**")
+            st.table(log_display.style.format({"TOTAL": "₱{:,.2f}"}))
+        else: st.warning("No transactions found.")
 
 # --- TAB 5: UTANG ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
-    today_dt_obj = datetime.now().date()
-    max_due = today_dt_obj + pd.Timedelta(days=7)
+    now_dt = datetime.now().date()
+    max_due_dt = now_dt + pd.Timedelta(days=7)
     
     with st.form("u_form", clear_on_submit=True):
-        un = st.text_input("NAME").upper()
-        up = st.text_input("PHONE")
-        ua = st.number_input("AMOUNT", min_value=0.0)
-        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_dt_obj, max_value=max_due)
-        
+        un_u = st.text_input("NAME").upper()
+        up_u = st.text_input("PHONE")
+        ua_u = st.number_input("AMOUNT", min_value=0.0)
+        ud_u = st.date_input("DUE DATE (Max 7 Days)", value=max_due_dt, min_value=now_dt, max_value=max_due_dt)
         if st.form_submit_button("ADD DEBT"):
-            if un and up and ua > 0:
-                existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
-                if existing + ua > CREDIT_LIMIT:
-                    st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
-                else:
-                    st.session_state.db['debts'].append({
-                        "name": un, "phone": up, "amount": ua, 
-                        "date": str(today_dt_obj), "due_date": str(ud)
-                    })
-                    save_data(); st.success("Debt Added Successfully"); st.rerun()
+            existing_u = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un_u)
+            if existing_u + ua_u > CREDIT_LIMIT: st.error(f"❌ **LIMIT REACHED!** Current: ₱{existing_u:,.2f}")
+            else:
+                st.session_state.db['debts'].append({"name": un_u, "phone": up_u, "amount": ua_u, "date": str(now_dt), "due_date": str(ud_u)})
+                save_data(); st.success("Debt Added!"); st.rerun()
 
     if st.session_state.db['debts']:
         st.write("---")
-        d_df = pd.DataFrame(st.session_state.db['debts'])
+        d_df_u = pd.DataFrame(st.session_state.db['debts'])
+        d_df_u['DUE_DT'] = pd.to_datetime(d_df_u['due_date']).dt.date
+        d_df_u['DAYS_LEFT'] = (d_df_u['DUE_DT'] - now_dt).apply(lambda x: x.days)
         
-        # Robust Date Logic
-        d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
-        now_dt = pd.to_datetime(datetime.now().date())
-        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
+        display_u = d_df_u[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
+        display_u.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
-        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
-        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
-        
-        def apply_row_styles(row):
-            days = row['DAYS_LEFT']
-            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red
-            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow
+        def style_u(row):
+            d = row['DAYS_LEFT']
+            if d < 0: return ['background-color: #ffcdd2'] * len(row)
+            if d <= 3: return ['background-color: #fff9c4'] * len(row)
             return [''] * len(row)
 
-        st.table(
-            display_debt.style.apply(apply_row_styles, axis=1)
-            .format({"AMOUNT": "₱{:,.2f}"})
-            .hide(axis="columns", subset=["DAYS_LEFT"]) 
-        )
+        st.table(display_u.style.apply(style_u, axis=1).format({"AMOUNT": "₱{:,.2f}"}).hide(axis="columns", subset=["DAYS_LEFT"]))
         
-        upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
-        if not upcoming.empty:
-            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
-
-        st.write("---")
-        # FIXED INDENTATION: Aligned with the 'if' block (8 spaces)
-        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
-                           format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
-        pers = st.session_state.db['debts'][idx]
+        idx_u = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), format_func=lambda x: st.session_state.db['debts'][x]['name'])
+        pers_u = st.session_state.db['debts'][idx_u]
+        p_days_u = (pd.to_datetime(pers_u['due_date']).date() - now_dt).days
         
-        p_due = pd.to_datetime(pers['due_date'])
-        p_days = int((p_due - now_dt).days) 
-
-        col_sms, col_pay = st.columns(2)
-        with col_sms:
-            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
-            if p_days <= 3:
-                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
-            
-            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
-        
-        with col_pay:
-            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
-                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+        c_sms, c_paid = st.columns(2)
+        with c_sms:
+            msg_u = f"Reminder: Your balance ₱{pers_u['amount']:,.2f} is due on {pers_u['due_date']}."
+            if p_days_u <= 3: msg_u = f"URGENT: Your balance ₱{pers_u['amount']:,.2f} is due in {p_days_u} days!"
+            st.link_button("SEND SMS", f"sms:{pers_u['phone']}?body={urllib.parse.quote(msg_u)}", use_container_width=True)
+        with c_paid:
+            if st.button("MARK PAID", type="primary", use_container_width=True):
+                st.session_state.db['debts'].pop(idx_u); save_data(); st.rerun()
