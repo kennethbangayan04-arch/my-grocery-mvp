@@ -89,6 +89,20 @@ total_products = len(st.session_state.db['inventory'])
 total_expenses = p_df['total'].sum() if not p_df.empty else 0
 low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= 5)
 
+# --- TOP DASHBOARD LOGIC ---
+# We define 'low' as 5 units or less (Safety Buffer)
+low_stock_threshold = 5 
+low_stock_count = sum(1 for v in st.session_state.db['inventory'].values() if v['stock'] <= low_stock_threshold)
+
+# Display in the 4th card (Teal)
+with c4:
+    st.markdown(f'''
+        <div class="metric-card" style="border-left-color: #e0f2f1;">
+            <div class="metric-title">📉 {D["low"]}</div>
+            <div class="metric-value">{low_stock_count}</div>
+        </div>
+    ''', unsafe_allow_html=True)
+
 c1, c2, c3, c4 = st.columns(4)
 with c1: st.markdown(f'<div class="metric-card" style="border-left-color: #fce4ec;"><div class="metric-title">{D["rev"]}</div><div class="metric-value">₱{today_sales:,.2f}</div></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="metric-card" style="border-left-color: #e3f2fd;"><div class="metric-title">{D["inv"]}</div><div class="metric-value">{total_products}</div></div>', unsafe_allow_html=True)
@@ -131,37 +145,42 @@ with t1:
             save_data(); st.session_state.cart = []; st.balloons(); st.rerun()
         if cc.button(D["btn_clear"], use_container_width=True): st.session_state.cart = []; st.rerun()
 
-# --- TAB 2: INVENTORY ---
+# --- TAB 2: INVENTORY (With Notifications) ---
 with t2:
-    st.markdown(f"### {D['inv']}")
-    with st.expander("Register New Product"):
-        with st.form("reg_form", clear_on_submit=True):
-            c_i = st.text_input("Code")
-            n_i = st.text_input("Name").upper()
-            cs, cb, cp = st.columns(3)
-            s_i = cs.number_input("Stock", min_value=0)
-            b_i = cb.number_input("Bought Price", min_value=0.0)
-            p_i = cp.number_input("SRP", min_value=0.0)
-            if st.form_submit_button("Save"):
-                st.session_state.db['inventory'][c_i] = {"name": n_i, "stock": s_i, "bought": b_i, "price": p_i, "min_alert": 5}
-                save_data(); st.rerun()
+    st.markdown("### 📦 Stock Management")
+    
+    # Global Notification Area
+    if low_stock_count > 0:
+        st.error(f"🚨 **{D['low_stock']}** {low_stock_count} items need restocking!")
 
     if st.session_state.db['inventory']:
+        st.write("---")
         h1, h2, h3, h4, h5, h6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
         h1.write("**CODE**"); h2.write("**NAME**"); h3.write("**STOCK**"); h4.write("**SRP**"); h5.write("**ADD**"); h6.write("**DEL**")
+        
         for code, det in list(st.session_state.db['inventory'].items()):
             r1, r2, r3, r4, r5, r6 = st.columns([1.5, 2.5, 1, 1, 1.5, 1])
-            r1.write(f"`{code}`"); r2.write(det['name']); r3.write(str(det['stock'])); r4.write(f"₱{det['price']:.2f}")
+            
+            r1.write(f"`{code}`")
+            r2.write(det['name'])
+            
+            # --- HIGHLIGHT LOW STOCK ---
+            if det['stock'] <= low_stock_threshold:
+                r3.write(f"🔴 **{det['stock']}**") # Red and Bold for danger
+            else:
+                r3.write(f"🟢 {det['stock']}")
+            
+            r4.write(f"₱{det['price']:.2f}")
+            
             with r5:
                 with st.popover("➕"):
-                    amt = st.number_input("Qty", min_value=1, key=f"add_{code}")
-                    if st.button("Save", key=f"btn_{code}"):
+                    amt = st.number_input("Qty", min_value=1, key=f"add_stock_{code}")
+                    if st.button("Save", key=f"btn_stock_{code}"):
                         st.session_state.db['inventory'][code]['stock'] += amt
                         save_data(); st.rerun()
-            if r6.button("🗑️", key=f"del_{code}"):
-                del st.session_state.db['inventory'][code]; save_data(); st.rerun()
-
-# --- TAB 3: EXPENSES (With Receipt Upload) ---
+            
+            if r6.button("🗑️", key=f"del_item_{code}"):
+                del st.session_state.db['inventory'][code]; save_data(); st.rerun()# --- TAB 3: EXPENSES (With Receipt Upload) ---
 with t3:
     st.markdown(f"### {D['exp']}")
     
