@@ -207,23 +207,73 @@ with t3:
         f_df.columns = ["DATE", "STORE", "AMOUNT", "RECEIPT"]
         st.table(f_df)
 
-# --- TAB 4: REPORTS ---
+# --- TAB 4: REPORTS (Financial Summary) ---
 with t4:
-    st.markdown("### Financial Analysis")
+    st.markdown("### 📊 Financial Analysis")
+    
     if not s_df.empty:
+        # 1. Data Preparation
         s_df['date'] = pd.to_datetime(s_df['date'])
         s_df['month_year'] = s_df['date'].dt.strftime('%B %Y')
-        sel_m = st.selectbox("Select Report Month", s_df['month_year'].unique(), key="rep_month_sel")
-        m_sales = s_df[s_df['month_year'] == sel_m].copy()
-        rev = m_sales['total'].sum()
-        markup = ((m_sales['srp'] - m_sales['bought']) * m_sales['qty']).sum()
-        exp_total = p_df[pd.to_datetime(p_df['date']).dt.strftime('%B %Y') == sel_m]['total'].sum() if not p_df.empty else 0
         
-        st.metric("Net Profit", f"₱{markup - exp_total:,.2f}")
+        # Month Selector
+        available_months = s_df['month_year'].unique()
+        sel_m = st.selectbox("Select Report Month", available_months, index=len(available_months)-1, key="rep_month_sel")
+        
+        # Filter data for calculations
+        m_sales = s_df[s_df['month_year'] == sel_m].copy()
+        
+        # 2. CALCULATIONS (The "Material Balance" of Money)
+        # Total Sales (Gross Revenue)
+        total_gross_sales = m_sales['total'].sum()
+        
+        # Total Cost of Goods Sold (COGS)
+        # This uses the 'bought' price you saved in inventory
+        total_cogs = (m_sales['bought'] * m_sales['qty']).sum()
+        
+        # Operational Expenses (from Tab 3)
+        m_exp_df = pd.DataFrame(st.session_state.db['purchase_receipts'])
+        exp_total = 0
+        if not m_exp_df.empty:
+            m_exp_df['date'] = pd.to_datetime(m_exp_df['date'])
+            exp_total = m_exp_df[m_exp_df['date'].dt.strftime('%B %Y') == sel_m]['total'].sum()
+        
+        # Net Profit = (Sales - COGS) - OpEx
+        gross_profit = total_gross_sales - total_cogs
+        net_profit = gross_profit - exp_total
+
+        # 3. DISPLAY METRICS
+        st.write(f"#### Summary for {sel_m}")
+        col_g, col_e, col_n = st.columns(3)
+        
+        with col_g:
+            st.metric("Gross Sales", f"₱{total_gross_sales:,.2f}")
+            st.caption("Total cash received")
+            
+        with col_e:
+            st.metric("Total Expenses", f"₱{exp_total:,.2f}")
+            st.caption("Operating costs & bills")
+            
+        with col_n:
+            # Color the profit green if positive, red if negative
+            st.metric("Net Profit", f"₱{net_profit:,.2f}", delta=f"₱{gross_profit:,.2f} Gross")
+            st.caption("Take-home earnings")
+
         st.write("---")
-        st.subheader("Daily Sales Trend")
+        
+        # 4. TREND GRAPH
+        st.subheader("Daily Sales Performance")
         m_sales['day'] = m_sales['date'].dt.date
-        st.line_chart(m_sales.groupby('day')['total'].sum())
+        daily_perf = m_sales.groupby('day')['total'].sum()
+        st.line_chart(daily_perf)
+        
+        # 5. TOP PRODUCTS PIE CHART (Bonus for M10)
+        st.subheader("Sales by Product")
+        product_share = m_sales.groupby('item')['total'].sum()
+        st.bar_chart(product_share)
+
+    else:
+        st.info("No sales recorded yet. Start selling to see your reports!")
 
 # --- TAB 5: UTANG (With ₱500 Credit Limit) ---
 with t5:
