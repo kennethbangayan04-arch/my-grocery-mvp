@@ -240,76 +240,60 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG ---
+# --- TAB 5: UTANG (Simplified: No Due Dates) ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
-    today_dt_obj = datetime.now().date()
-    max_due = today_dt_obj + pd.Timedelta(days=7)
     
     with st.form("u_form", clear_on_submit=True):
         un = st.text_input("NAME").upper()
         up = st.text_input("PHONE")
         ua = st.number_input("AMOUNT", min_value=0.0)
-        ud = st.date_input("DUE DATE (Max 7 Days)", value=max_due, min_value=today_dt_obj, max_value=max_due)
         
         if st.form_submit_button("ADD DEBT"):
             if un and up and ua > 0:
+                # Calculate existing debt for this person
                 existing = sum(d['amount'] for d in st.session_state.db['debts'] if d['name'] == un)
+                
                 if existing + ua > CREDIT_LIMIT:
                     st.error(f"❌ **LIMIT REACHED!** Current Debt: ₱{existing:,.2f}")
                 else:
                     st.session_state.db['debts'].append({
-                        "name": un, "phone": up, "amount": ua, 
-                        "date": str(today_dt_obj), "due_date": str(ud)
+                        "name": un, 
+                        "phone": up, 
+                        "amount": ua, 
+                        "date": str(datetime.now().date())
                     })
-                    save_data(); st.success("Debt Added Successfully"); st.rerun()
+                    save_data()
+                    st.success(f"✅ Debt registered for {un}")
+                    st.rerun()
 
     if st.session_state.db['debts']:
         st.write("---")
+        # 1. Prepare Data
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
-        # Robust Date Logic
-        d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
-        now_dt = pd.to_datetime(datetime.now().date())
-        d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
+        # 2. Capitalize Headers and Format Currency
+        display_debt = d_df[['name', 'phone', 'amount', 'date']].copy()
+        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE"]
         
-        display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
-        display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
+        # 3. Render Table with 2-Decimal Precision
+        st.table(display_debt.style.format({"AMOUNT": "₱{:,.2f}"}))
         
-        def apply_row_styles(row):
-            days = row['DAYS_LEFT']
-            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red
-            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow
-            return [''] * len(row)
-
-        st.table(
-            display_debt.style.apply(apply_row_styles, axis=1)
-            .format({"AMOUNT": "₱{:,.2f}"})
-            .hide(axis="columns", subset=["DAYS_LEFT"]) 
-        )
-        
-        upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
-        if not upcoming.empty:
-            st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
-
         st.write("---")
-        # FIXED INDENTATION: Aligned with the 'if' block (8 spaces)
-        idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
+        # 4. Action Section
+        idx = st.selectbox("SELECT CUSTOMER", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
-        p_due = pd.to_datetime(pers['due_date'])
-        p_days = int((p_due - now_dt).days) 
-
         col_sms, col_pay = st.columns(2)
         with col_sms:
-            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
-            if p_days <= 3:
-                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
-            
+            msg = f"Good day {pers['name']}! Friendly reminder of your balance at Bentamate: ₱{pers['amount']:,.2f}."
             st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
         
         with col_pay:
             if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
-                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
+                st.session_state.db['debts'].pop(idx)
+                save_data()
+                st.success("Record Updated!")
+                st.rerun()
