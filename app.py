@@ -301,21 +301,28 @@ with t5:
         if not upcoming.empty:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
-        st.write("---")
+st.write("---")
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
         
-       # --- THE FIX: Convert to clean Integer ---
-p_due = pd.to_datetime(pers['due_date'])
-# We use .days to get the integer count of days
-p_days = int((p_due - now_dt).days) 
+        # --- THE FIX: Correct Indentation & Integer Conversion ---
+        p_due = pd.to_datetime(pers['due_date'])
+        # now_dt was defined above as pd.to_datetime(datetime.now().date())
+        p_days = int((p_due - now_dt).days) 
 
-col_sms, col_pay = st.columns(2)
-with col_sms:
-    # Now p_days is a clean whole number (e.g., 3 instead of 3.0 or 3 days 00:00:00)
-    msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
-    if p_days <= 3:
+        col_sms, col_pay = st.columns(2)
+        with col_sms:
+            # Now p_days is a clean whole number (e.g., 3 instead of 3.0)
+            msg = f"Good day {pers['name']}! Your ₱{pers['amount']:,.2f} balance is due on {pers['due_date']}."
+            if p_days <= 3:
+                msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
+            
+            st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
+        
+        with col_pay:
+            if st.button("MARK PAID", type="primary", use_container_width=True, key="pay_debt_final"):
+                st.session_state.db['debts'].pop(idx); save_data(); st.rerun()
         msg = f"URGENT: {pers['name']}, your ₱{pers['amount']:,.2f} balance is due in {p_days} days!"
     
     st.link_button("SEND SMS", f"sms:{pers['phone']}?body={urllib.parse.quote(msg)}", use_container_width=True)
