@@ -65,9 +65,15 @@ D = {
 # --- SIDEBAR ---
 st.sidebar.title("🏪 Bentamate")
 st.sidebar.caption("Your Smart Business Companion")
-if st.sidebar.button("🗑️ Reset for New Owner"):
+
+# ADDED 'key="reset_button"' to distinguish it from any other buttons
+if st.sidebar.button(
+    "🗑️ Reset for New Owner" if lang == "English" else "🗑️ Reset para sa Bagong Owner",
+    key="reset_button" 
+):
     st.session_state.db = {'sales': [], 'inventory': {}, 'purchase_receipts': [], 'debts': []}
-    if os.path.exists(DB_FILE): os.remove(DB_FILE)
+    if os.path.exists(DB_FILE): 
+        os.remove(DB_FILE)
     st.rerun()
 
 # --- HEADER SECTION (Metric Cards) ---
