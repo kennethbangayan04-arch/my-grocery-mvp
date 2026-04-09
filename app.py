@@ -240,7 +240,7 @@ with t4:
     else:
         st.info("No data yet.")
 
-# --- TAB 5: UTANG ---
+# --- TAB 5: UTANG (Final Corrected & Performance Optimized) ---
 with t5:
     st.markdown("### Debt Registry (Limit: ₱500)")
     CREDIT_LIMIT = 500.0
@@ -267,34 +267,39 @@ with t5:
 
     if st.session_state.db['debts']:
         st.write("---")
+        # 1. Prepare Data
         d_df = pd.DataFrame(st.session_state.db['debts'])
         
-        # Date Logic
+        # 2. Vectorized Date Calculation
         d_df['DUE_DT'] = pd.to_datetime(d_df['due_date'])
         now_dt = pd.to_datetime(datetime.now().date())
         d_df['DAYS_LEFT'] = (d_df['DUE_DT'] - now_dt).dt.days
         
+        # 3. Create Display Version
         display_debt = d_df[['name', 'phone', 'amount', 'date', 'due_date', 'DAYS_LEFT']].copy()
         display_debt.columns = ["NAME", "PHONE", "AMOUNT", "DATE", "DUE DATE", "DAYS_LEFT"]
         
+        # 4. Styling Function
         def apply_row_styles(row):
             days = row['DAYS_LEFT']
-            if days < 0: return ['background-color: #ffcdd2'] * len(row)
-            if days <= 3: return ['background-color: #fff9c4'] * len(row)
+            if days < 0: return ['background-color: #ffcdd2'] * len(row) # Red (Overdue)
+            if days <= 3: return ['background-color: #fff9c4'] * len(row) # Yellow (Near)
             return [''] * len(row)
 
+        # 5. Render Table
         st.table(
             display_debt.style.apply(apply_row_styles, axis=1)
             .format({"AMOUNT": "₱{:,.2f}"})
             .hide(axis="columns", subset=["DAYS_LEFT"]) 
         )
         
+        # 6. Notifications
         upcoming = d_df[(d_df['DAYS_LEFT'] <= 3) & (d_df['DAYS_LEFT'] >= 0)]
         if not upcoming.empty:
             st.warning(f"🔔 **REMINDER:** {len(upcoming)} customer(s) due within 3 days!")
 
         st.write("---")
-        # FIXED INDENTATION STARTING HERE
+        # --- FIXED INDENTATION ON THIS BLOCK ---
         idx = st.selectbox("SELECT DEBTOR", range(len(st.session_state.db['debts'])), 
                            format_func=lambda x: st.session_state.db['debts'][x]['name'], key="debt_sel_final")
         pers = st.session_state.db['debts'][idx]
